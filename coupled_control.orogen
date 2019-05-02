@@ -1,0 +1,28 @@
+name "coupled_control"
+
+using_library "coupled_control"
+
+import_types_from "coupled_controlTypes.hpp"
+import_types_from "std"
+import_types_from "base"
+
+task_context "Task" do
+    
+    needs_configuration
+
+    property "mMaxSpeed", "double"
+	property "gain", "double"
+
+    input_port "motion_command", "base::commands::Motion2D"
+	input_port "current_segment", "int"
+	input_port "assignment", "std::vector<int>"
+	input_port "manipulatorConfig", "std::vector<double>"
+	input_port "currentConfig", "std::vector<double>"
+
+    output_port "motion_command", "base::commands::Motion2D"
+	output_port "manipulator_command", "std::vector<double>"
+
+
+    periodic 0.01
+end
+
