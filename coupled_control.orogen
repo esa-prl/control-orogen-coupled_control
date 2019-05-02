@@ -19,7 +19,7 @@ task_context "Task" do
 	input_port "manipulatorConfig", "std::vector<double>"
 	input_port "currentConfig", "std::vector<double>"
 
-    output_port "motion_command", "base::commands::Motion2D"
+    output_port "modified_motion_command", "base::commands::Motion2D"
 	output_port "manipulator_command", "std::vector<double>"
 
 
