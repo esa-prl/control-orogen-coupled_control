@@ -1,4 +1,5 @@
 name "coupled_control"
+version "0.1"
 
 using_library "coupled_control"
 
@@ -12,17 +13,21 @@ task_context "Task" do
 
     property "mMaxSpeed", "double"
 	property "gain", "double"
+	property "num_joints", "int"
 
-    input_port "motion_command", "base::commands::Motion2D"
-	input_port "current_segment", "int"
-	input_port "assignment", "std::vector<int>"
-	input_port "manipulatorConfig", "std::vector<double>"
-	input_port "currentConfig", "std::vector<double>"
+	
+    input_port("motionCommand", "base::commands::Motion2D")
+	input_port("currentSegment", "int")
 
-    output_port "modified_motion_command", "base::commands::Motion2D"
-	output_port "manipulator_command", "std::vector<double>"
+	input_port("sizePath","int")
+	input_port("assignment", "std::vector<int>")
+	input_port("manipulatorConfig", "std::vector<double>")
+	
+	input_port("currentConfig", "std::vector<double>")
 
+    output_port("modifiedMotionCommand", "base::commands::Motion2D")
+	output_port("manipulatorCommand", "std::vector<double>")
 
-    periodic 0.01
+    port_driven
 end
 
