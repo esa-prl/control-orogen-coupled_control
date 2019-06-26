@@ -23,7 +23,7 @@ namespace coupled_control{
 			// Property variables
 			double mMaxSpeed;
 			double gain;
-			int num_joints;
+			int num_joints=5;
 			int maxJW;
 			int saturation;
 
@@ -33,6 +33,8 @@ namespace coupled_control{
 			std::vector<int> assignment;
 			std::vector<double> manipulatorConfig;
 			std::vector<double> currentConfig;
+
+			int sizePath;
 
 			// Output variables
 			base::commands::Motion2D modified_motion_command;
