@@ -33,6 +33,7 @@ namespace coupled_control{
 			std::vector<int> assignment;
 			std::vector<double> manipulatorConfig;
 			std::vector<double> currentConfig;
+			std::vector<double> initialConfig;
 
 			int sizePath;
 

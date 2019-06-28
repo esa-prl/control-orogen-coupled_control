@@ -31,16 +31,9 @@ bool Task::configureHook()
 	mMaxSpeed = _mMaxSpeed.get(); // Maximum manipulator's joints angular speed
 	gain = _gain.get(); // Position control gain
 	num_joints = _num_joints.get(); // Number of manipulator's joints
+	initialConfig = _initialConfig.get(); // Initial configuration of the arm
 
-
-
-	_assignment.read(assignment);
-	_manipulatorConfig.read(manipulatorConfig); // Joint position along the trajectory
-	_sizePath.read(sizePath);
-
-	assignment.resize(sizePath);
-	manipulatorConfig.resize(sizePath*numJoints);
-
+	
 
 	nextConfig.resize(num_joints);
 	jW.resize(num_joints);
@@ -55,12 +48,25 @@ bool Task::startHook()
 {
     if (! TaskBase::startHook())
         return false;
+
+	
     return true;
 }
 void Task::updateHook()
 {
     TaskBase::updateHook();
 
+	// Rover path size
+	_sizePath.read(sizePath);
+
+
+	//Resize assignment and joints local vectors
+	assignment.resize(sizePath);
+	manipulatorConfig.resize(sizePath*num_joints);
+
+
+	_assignment.read(assignment);
+	_manipulatorConfig.read(manipulatorConfig); // Joint position along the trajectory
 	
 	if(_motionCommand.read(motion_command) == RTT::NewData) // Actual joint position 
 	{
@@ -70,19 +76,21 @@ void Task::updateHook()
 		std::cout << "Coupled control: inputs received. Current segment:" << current_segment << std::endl;
 		// Next manipulator's joints configuration
 		coupledControl->selectNextManipulatorPosition(current_segment, assignment, manipulatorConfig, nextConfig);
-	
+				
 		// Range input angles from 0 to 2pi
 
 		std::cout << "Current configuration: ";
 
 		for(int i = 0; i < num_joints; i++)
 		{
-			currentConfig.at(i) = coupledControl->constrainAngle(currentConfig.at(i));
+			nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i));
+			if(i==0||i==1||i==3) currentConfig.at(i) = coupledControl->constrainAngle(-currentConfig.at(i));
+			currentConfig.at(i) = coupledControl->constrainAngle(currentConfig.at(i)+initialConfig.at(i));
 			std::cout << currentConfig.at(i) << "  ";
 		}
 		std::cout << endl;
 
-
+		
 		// Position control
 		coupledControl->manipulatorMotionControl(gain, saturation, mMaxSpeed, nextConfig, currentConfig, jW);
 
@@ -95,6 +103,7 @@ void Task::updateHook()
 
 			saturation = 0;
 			_manipulatorCommand.write(jW);
+			std::cout << "Conversion relation: " << 1 << std::endl;
 			std::cout << "Coupled control: no saturation" << std::endl;
 		}
 		else
