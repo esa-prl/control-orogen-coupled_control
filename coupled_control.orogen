@@ -11,10 +11,13 @@ task_context "Task" do
     
     needs_configuration
 
+    property "positionCommands","int"
     property "mMaxSpeed", "double"
 	property "gain", "double"
-	property "num_joints", "int"
-	property "initialConfig","std::vector<double>"
+	property "numJoints", "int"
+	property "modelInitialConfig","std::vector<double>"
+	property "realInitialConfig","std::vector<double>"
+	property "jointsDirection","std::vector<double>"
 	
     input_port("motionCommand", "base::commands::Motion2D")
 	input_port("currentSegment", "int")

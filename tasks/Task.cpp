@@ -28,15 +28,20 @@ bool Task::configureHook()
         return false;
 
 	// Constant variables
-	mMaxSpeed = _mMaxSpeed.get(); // Maximum manipulator's joints angular speed
-	gain = _gain.get(); // Position control gain
-	num_joints = _num_joints.get(); // Number of manipulator's joints
-	initialConfig = _initialConfig.get(); // Initial configuration of the arm
+	positionCommands = _positionCommands.get();		// Position or velocity commands
+	mMaxSpeed = _mMaxSpeed.get(); 					// Maximum manipulator's joints angular speed
+	gain = _gain.get(); 							// Position control gain
+	numJoints = _numJoints.get(); 					// Number of manipulator's joints
+	modelInitialConfig = _modelInitialConfig.get(); // Initial configuration of the arm (IK model)
+	realInitialConfig = _realInitialConfig.get();	// Initial configuration of the arm (real)		
+	jointsDirection = _jointsDirection.get();	 	// Direction of each joint movements
 
-	
+	nextConfig.resize(numJoints);
+	jW.resize(numJoints);
+	configChange.resize(numJoints);
 
-	nextConfig.resize(num_joints);
-	jW.resize(num_joints);
+	for(int i = 0; i < numJoints; i++)	configChange.at(i) = modelInitialConfig.at(i) - realInitialConfig.at(i);
+
 
 	saturation = 0;
 
@@ -62,7 +67,7 @@ void Task::updateHook()
 
 	//Resize assignment and joints local vectors
 	assignment.resize(sizePath);
-	manipulatorConfig.resize(sizePath*num_joints);
+	manipulatorConfig.resize(sizePath*numJoints);
 
 
 	_assignment.read(assignment);
@@ -81,11 +86,11 @@ void Task::updateHook()
 
 		std::cout << "Current configuration: ";
 
-		for(int i = 0; i < num_joints; i++)
+		for(int i = 0; i < numJoints; i++)
 		{
 			nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i));
-			if(i==0||i==1||i==3) currentConfig.at(i) = coupledControl->constrainAngle(-currentConfig.at(i));
-			currentConfig.at(i) = coupledControl->constrainAngle(currentConfig.at(i)+initialConfig.at(i));
+			currentConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*currentConfig.at(i));
+			currentConfig.at(i) = coupledControl->constrainAngle(currentConfig.at(i)+configChange.at(i));
 			std::cout << currentConfig.at(i) << "  ";
 		}
 		std::cout << endl;
@@ -94,31 +99,40 @@ void Task::updateHook()
 		// Position control
 		coupledControl->manipulatorMotionControl(gain, saturation, mMaxSpeed, nextConfig, currentConfig, jW);
 
-		if(saturation == 0)
-		{	
-			// Rover motion command is not modified 
-
-			modified_motion_command = motion_command;
-			_modifiedMotionCommand.write(modified_motion_command);
-
-			saturation = 0;
-			_manipulatorCommand.write(jW);
-			std::cout << "Conversion relation: " << 1 << std::endl;
-			std::cout << "Coupled control: no saturation" << std::endl;
-		}
-		else
+		modified_motion_command = motion_command;
+		if(saturation == 1)
 		{
 			// Maximum manipulator's joints speed
 			maxJW = coupledControl->findMaxValue(jW);
-			// Rover motion command is modified 
 
+			// Rover motion command is modified 
 			coupledControl->modifyMotionCommand(mMaxSpeed, abs(jW.at(maxJW)), jW, motion_command, modified_motion_command);
 
-			_modifiedMotionCommand.write(modified_motion_command);
-			_manipulatorCommand.write(jW);
 			saturation = 0;
 			std::cout << "Coupled control: saturation" << std::endl;
 		}
+		else
+		{
+			// Rover motion command is not modified 
+			std::cout << "Conversion relation: " << 1 << std::endl;
+			std::cout << "Coupled control: no saturation" << std::endl;
+		}
+
+		// Sending outputs
+		_modifiedMotionCommand.write(modified_motion_command);
+
+		if(positionCommands == 0) _manipulatorCommand.write(jW);
+		else 
+		{
+			for(int i = 0; i < numJoints; i++)
+				{
+					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)-configChange.at(i));
+					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i));
+				}
+			_manipulatorCommand.write(nextConfig);
+			
+		}
+
 
 		std::cout << "Motion command. Translation: " << modified_motion_command.translation << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
 

@@ -21,21 +21,24 @@ namespace coupled_control{
 			coupled_control::coupledControl *coupledControl;
 
 			// Property variables
+			int positionCommands;
 			double mMaxSpeed;
 			double gain;
-			int num_joints=5;
-			int maxJW;
-			int saturation;
+			int numJoints=5;
+			std::vector<double> modelInitialConfig;
+			std::vector<double> realInitialConfig;
+			std::vector<double> jointsDirection;
+
 
 			// Input variables
 			base::commands::Motion2D motion_command;
 			int current_segment;
-			std::vector<int> assignment;
-			std::vector<double> manipulatorConfig;
-			std::vector<double> currentConfig;
-			std::vector<double> initialConfig;
 
 			int sizePath;
+			std::vector<int> assignment;
+			std::vector<double> manipulatorConfig;
+
+			std::vector<double> currentConfig;
 
 			// Output variables
 			base::commands::Motion2D modified_motion_command;
@@ -44,6 +47,9 @@ namespace coupled_control{
 			// Local variables
 			std::vector<double> nextConfig;
 			std::vector<double> jW;
+			int saturation;
+			int maxJW;
+			std::vector<double> configChange;
 		
 
 
