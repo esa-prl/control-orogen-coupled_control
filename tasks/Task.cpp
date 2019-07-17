@@ -78,6 +78,14 @@ void Task::updateHook()
 		_currentConfig.read(currentConfig); // Current arm configuration
 		_currentSegment.read(current_segment);
 
+
+		//Changing from base::samples::Joints to vector<double>
+		for(int i = 0; i < numJoints; i++)
+		{
+			base::JointState& joint(currentConfig[i]);
+		    current_config[i] = joint.position;
+		}
+
 		std::cout << "Coupled control: inputs received. Current segment:" << current_segment << std::endl;
 		// Next manipulator's joints configuration
 		coupledControl->selectNextManipulatorPosition(current_segment, assignment, manipulatorConfig, nextConfig);
@@ -89,15 +97,15 @@ void Task::updateHook()
 		for(int i = 0; i < numJoints; i++)
 		{
 			nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i));
-			currentConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*currentConfig.at(i));
-			currentConfig.at(i) = coupledControl->constrainAngle(currentConfig.at(i)+configChange.at(i));
-			std::cout << currentConfig.at(i) << "  ";
+			current_config.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*current_config.at(i));
+			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)+configChange.at(i));
+			std::cout << current_config.at(i) << "  ";
 		}
 		std::cout << endl;
 
 		
 		// Position control
-		coupledControl->manipulatorMotionControl(gain, saturation, mMaxSpeed, nextConfig, currentConfig, jW);
+		coupledControl->manipulatorMotionControl(gain, saturation, mMaxSpeed, nextConfig, current_config, jW);
 
 		modified_motion_command = motion_command;
 		if(saturation == 1)
@@ -121,7 +129,15 @@ void Task::updateHook()
 		// Sending outputs
 		_modifiedMotionCommand.write(modified_motion_command);
 
-		if(positionCommands == 0) _manipulatorCommand.write(jW);
+
+		
+	
+		if(positionCommands == 0) 
+		{
+			//Changing from vector<double> to base::commands::Joints (speeds)
+			base::commands::Joints velocityCommand(base::commands::Joints::Speeds(jW));
+			_manipulatorCommand.write(velocityCommand);
+		}
 		else 
 		{
 			for(int i = 0; i < numJoints; i++)
@@ -129,7 +145,9 @@ void Task::updateHook()
 					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)-configChange.at(i));
 					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i));
 				}
-			_manipulatorCommand.write(nextConfig);
+			//Changing from vector<double> to base::commands::Joints (speeds)
+			base::commands::Joints positionCommand(base::commands::Joints::Positions(nextConfig));
+			_manipulatorCommand.write(positionCommand);
 			
 		}
 

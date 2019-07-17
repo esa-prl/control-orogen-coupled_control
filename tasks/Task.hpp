@@ -38,18 +38,18 @@ namespace coupled_control{
 			std::vector<int> assignment;
 			std::vector<double> manipulatorConfig;
 
-			std::vector<double> currentConfig;
+			base::samples::Joints currentConfig;
 
 			// Output variables
 			base::commands::Motion2D modified_motion_command;
-			std::vector<double> manipulator_command;
 
 			// Local variables
 			std::vector<double> nextConfig;
-			std::vector<double> jW;
+			std::vector<float> jW;
 			int saturation;
 			int maxJW;
 			std::vector<double> configChange;
+			std::vector<double> current_config;
 		
 
 

@@ -25,11 +25,11 @@ task_context "Task" do
 	input_port("sizePath","int")
 	input_port("assignment", "std::vector<int>")
 	input_port("manipulatorConfig", "std::vector<double>")
-	
-	input_port("currentConfig", "std::vector<double>")
+
+	input_port("currentConfig", "/base/samples/Joints")
 
     output_port("modifiedMotionCommand", "base::commands::Motion2D")
-	output_port("manipulatorCommand", "std::vector<double>")
+	output_port("manipulatorCommand", "base/commands/Joints")
 
 	port_driven
 end
