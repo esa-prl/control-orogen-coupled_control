@@ -40,7 +40,7 @@ bool Task::configureHook()
 	jW.resize(numJoints);
 	configChange.resize(numJoints);
 
-	for(int i = 0; i < numJoints; i++)	configChange.at(i) = modelInitialConfig.at(i) - realInitialConfig.at(i);
+	for(int i = 0; i < numJoints; i++)	configChange.at(i) = jointsDirection.at(i)*(modelInitialConfig.at(i) + realInitialConfig.at(i));
 
 
 	saturation = 0;
@@ -98,7 +98,7 @@ void Task::updateHook()
 		{
 			nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i));
 			current_config.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*current_config.at(i));
-			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)+configChange.at(i));
+			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)-configChange.at(i));
 			std::cout << current_config.at(i) << "  ";
 		}
 		std::cout << endl;
@@ -142,7 +142,7 @@ void Task::updateHook()
 		{
 			for(int i = 0; i < numJoints; i++)
 				{
-					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)-configChange.at(i));
+					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)+configChange.at(i));
 					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i));
 				}
 			//Changing from vector<double> to base::commands::Joints (speeds)
