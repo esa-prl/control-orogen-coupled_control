@@ -146,7 +146,8 @@ void Task::updateHook()
 					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i));
 				}
 			//Changing from vector<double> to base::commands::Joints (speeds)
-			base::commands::Joints positionCommand(base::commands::Joints::Positions(nextConfig));
+            std::vector<std::string> names{"ARM_JOINT_1","ARM_JOINT_2","ARM_JOINT_3","ARM_JOINT_4","ARM_JOINT_5"};
+			base::commands::Joints positionCommand(base::commands::Joints::Positions(nextConfig,names));
 			_manipulatorCommand.write(positionCommand);
 			
 		}
