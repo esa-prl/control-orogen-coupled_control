@@ -35,10 +35,14 @@ bool Task::configureHook()
 	modelInitialConfig = _modelInitialConfig.get(); // Initial configuration of the arm (IK model)
 	realInitialConfig = _realInitialConfig.get();	// Initial configuration of the arm (real)		
 	jointsDirection = _jointsDirection.get();	 	// Direction of each joint movements
+    smoothFactor = _smoothFactor.get();             // Smooth transitions between modified motion commands
+    if(smoothFactor < 0) smoothFactor = 0;          // No smoothing
+    else if(smoothFactor > 0.9) smoothFactor = 0.9; // Max smoothing 90%
 
 	nextConfig.resize(numJoints);
 	jW.resize(numJoints);
 	configChange.resize(numJoints);
+    current_config.resize(numJoints);
 
 	for(int i = 0; i < numJoints; i++)	configChange.at(i) = jointsDirection.at(i)*(modelInitialConfig.at(i) + realInitialConfig.at(i));
 
@@ -75,9 +79,9 @@ void Task::updateHook()
 	
 	if(_motionCommand.read(motion_command) == RTT::NewData) // Actual joint position 
 	{
+        if(firstCommand == 1) _motionCommand.read(last_motion_command);
 		_currentConfig.read(currentConfig); // Current arm configuration
 		_currentSegment.read(current_segment);
-
 
 		//Changing from base::samples::Joints to vector<double>
 		for(int i = 0; i < numJoints; i++)
@@ -96,14 +100,13 @@ void Task::updateHook()
 
 		for(int i = 0; i < numJoints; i++)
 		{
+			std::cout << current_config.at(i) << "  ";
 			nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i));
 			current_config.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*current_config.at(i));
 			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)-configChange.at(i));
-			std::cout << current_config.at(i) << "  ";
 		}
 		std::cout << endl;
 
-		
 		// Position control
 		coupledControl->manipulatorMotionControl(gain, saturation, mMaxSpeed, nextConfig, current_config, jW);
 
@@ -117,6 +120,7 @@ void Task::updateHook()
 			coupledControl->modifyMotionCommand(mMaxSpeed, abs(jW.at(maxJW)), jW, motion_command, modified_motion_command);
 
 			saturation = 0;
+            firstCommand = 0;
 			std::cout << "Coupled control: saturation" << std::endl;
 		}
 		else
@@ -126,35 +130,40 @@ void Task::updateHook()
 			std::cout << "Coupled control: no saturation" << std::endl;
 		}
 
+        modified_motion_command.translation = (modified_motion_command.translation*(1-smoothFactor)+last_motion_command.translation*smoothFactor)/2;
+        modified_motion_command.rotation = (modified_motion_command.rotation*(1-smoothFactor)+last_motion_command.rotation*smoothFactor)/2;
+
 		// Sending outputs
 		_modifiedMotionCommand.write(modified_motion_command);
 
-
-		
-	
 		if(positionCommands == 0) 
 		{
 			//Changing from vector<double> to base::commands::Joints (speeds)
-			base::commands::Joints velocityCommand(base::commands::Joints::Speeds(jW));
+            std::vector<std::string> names{"ARM_JOINT_1","ARM_JOINT_2","ARM_JOINT_3","ARM_JOINT_4","ARM_JOINT_5"};
+			base::commands::Joints velocityCommand(base::commands::Joints::Speeds(jW,names));
+            velocityCommand.time = base::Time::now();
 			_manipulatorCommand.write(velocityCommand);
 		}
 		else 
 		{
+		    std::cout << "Manipulator configuration goal: ";
 			for(int i = 0; i < numJoints; i++)
 				{
 					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)+configChange.at(i));
 					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i));
+			        std::cout << nextConfig.at(i) << "  ";
 				}
+		    std::cout << endl;
+
 			//Changing from vector<double> to base::commands::Joints (speeds)
             std::vector<std::string> names{"ARM_JOINT_1","ARM_JOINT_2","ARM_JOINT_3","ARM_JOINT_4","ARM_JOINT_5"};
 			base::commands::Joints positionCommand(base::commands::Joints::Positions(nextConfig,names));
+            positionCommand.time = base::Time::now();
 			_manipulatorCommand.write(positionCommand);
 			
 		}
 
-
 		std::cout << "Motion command. Translation: " << modified_motion_command.translation << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
-
 	}
 }
 void Task::errorHook()

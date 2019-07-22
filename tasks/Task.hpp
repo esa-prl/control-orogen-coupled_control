@@ -8,6 +8,7 @@
 #include <base/samples/Joints.hpp>
 #include <base/commands/Joints.hpp>
 #include <base/commands/Motion2D.hpp>
+#include <base-logging/Logging.hpp>
 #include <vector>
 
 
@@ -28,7 +29,7 @@ namespace coupled_control{
 			std::vector<double> modelInitialConfig;
 			std::vector<double> realInitialConfig;
 			std::vector<double> jointsDirection;
-
+            double smoothFactor;
 
 			// Input variables
 			base::commands::Motion2D motion_command;
@@ -50,7 +51,9 @@ namespace coupled_control{
 			int maxJW;
 			std::vector<double> configChange;
 			std::vector<double> current_config;
-		
+			base::commands::Motion2D last_motion_command;
+            int firstCommand = 1;
+
 
 
 		public:

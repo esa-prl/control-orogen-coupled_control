@@ -15,20 +15,21 @@ task_context "Task" do
     property "mMaxSpeed", "double"
 	property "gain", "double"
 	property "numJoints", "int"
-	property "modelInitialConfig","std::vector<double>"
-	property "realInitialConfig","std::vector<double>"
-	property "jointsDirection","std::vector<double>"
+	property "modelInitialConfig","std/vector<double>"
+	property "realInitialConfig","std/vector<double>"
+	property "jointsDirection","std/vector<double>"
+	property "smoothFactor", "double"
 	
-    input_port("motionCommand", "base::commands::Motion2D")
+    input_port("motionCommand", "base/commands/Motion2D")
 	input_port("currentSegment", "int")
 
 	input_port("sizePath","int")
-	input_port("assignment", "std::vector<int>")
-	input_port("manipulatorConfig", "std::vector<double>")
+	input_port("assignment", "std/vector<int>")
+	input_port("manipulatorConfig", "std/vector<double>")
 
 	input_port("currentConfig", "/base/samples/Joints")
 
-    output_port("modifiedMotionCommand", "base::commands::Motion2D")
+    output_port("modifiedMotionCommand", "base/commands/Motion2D")
 	output_port("manipulatorCommand", "base/commands/Joints")
 
 	port_driven
