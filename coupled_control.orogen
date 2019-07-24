@@ -19,6 +19,7 @@ task_context "Task" do
 	property "realInitialConfig","std/vector<double>"
 	property "jointsDirection","std/vector<double>"
 	property "smoothFactor", "double"
+	property "negativeAngles", "int"
 	
     input_port("motionCommand", "base/commands/Motion2D")
 	input_port("currentSegment", "int")

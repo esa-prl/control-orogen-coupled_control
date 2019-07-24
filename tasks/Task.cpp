@@ -38,6 +38,7 @@ bool Task::configureHook()
     smoothFactor = _smoothFactor.get();             // Smooth transitions between modified motion commands
     if(smoothFactor < 0) smoothFactor = 0;          // No smoothing
     else if(smoothFactor > 0.9) smoothFactor = 0.9; // Max smoothing 90%
+	negativeAngles = _negativeAngles.get();	    	// Wrapping angles between 0 and 2pi or -pi and pi
 
 	nextConfig.resize(numJoints);
 	jW.resize(numJoints);
@@ -92,7 +93,7 @@ void Task::updateHook()
 
 		std::cout << "Coupled control: inputs received. Current segment:" << current_segment << std::endl;
 		// Next manipulator's joints configuration
-		coupledControl->selectNextManipulatorPosition(current_segment, assignment, manipulatorConfig, nextConfig);
+		coupledControl->selectNextManipulatorPosition(current_segment, assignment, manipulatorConfig, nextConfig, negativeAngles);
 				
 		// Range input angles from 0 to 2pi
 
@@ -101,9 +102,8 @@ void Task::updateHook()
 		for(int i = 0; i < numJoints; i++)
 		{
 			std::cout << current_config.at(i) << "  ";
-			nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i));
-			current_config.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*current_config.at(i));
-			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)-configChange.at(i));
+			current_config.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*current_config.at(i), negativeAngles);
+			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)-configChange.at(i), negativeAngles);
 		}
 		std::cout << endl;
 
@@ -149,8 +149,8 @@ void Task::updateHook()
 		    std::cout << "Manipulator configuration goal: ";
 			for(int i = 0; i < numJoints; i++)
 				{
-					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)+configChange.at(i));
-					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i));
+					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)+configChange.at(i), negativeAngles);
+					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i), negativeAngles);
 			        std::cout << nextConfig.at(i) << "  ";
 				}
 		    std::cout << endl;

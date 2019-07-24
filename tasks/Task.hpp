@@ -30,6 +30,7 @@ namespace coupled_control{
 			std::vector<double> realInitialConfig;
 			std::vector<double> jointsDirection;
             double smoothFactor;
+			int negativeAngles;
 
 			// Input variables
 			base::commands::Motion2D motion_command;
