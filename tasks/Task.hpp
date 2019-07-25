@@ -25,7 +25,7 @@ namespace coupled_control{
 			int positionCommands;
 			double mMaxSpeed;
 			double gain;
-			int numJoints=5;
+			int numJoints;
 			std::vector<double> modelInitialConfig;
 			std::vector<double> realInitialConfig;
 			std::vector<double> jointsDirection;

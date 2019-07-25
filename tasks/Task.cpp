@@ -66,21 +66,21 @@ void Task::updateHook()
 {
     TaskBase::updateHook();
 
-	// Rover path size
-	_sizePath.read(sizePath);
+	if(_sizePath.read(sizePath) == RTT::NewData) // Rover path size
+    {
+        //Resize assignment and joints local vectors
+        assignment.resize(sizePath);
+        manipulatorConfig.resize(sizePath*numJoints);
 
 
-	//Resize assignment and joints local vectors
-	assignment.resize(sizePath);
-	manipulatorConfig.resize(sizePath*numJoints);
+        _assignment.read(assignment);
+        _manipulatorConfig.read(manipulatorConfig); // Joint position along the trajectory
+    }
 
-
-	_assignment.read(assignment);
-	_manipulatorConfig.read(manipulatorConfig); // Joint position along the trajectory
-	
 	if(_motionCommand.read(motion_command) == RTT::NewData) // Actual joint position 
 	{
         if(firstCommand == 1) _motionCommand.read(last_motion_command);
+
 		_currentConfig.read(currentConfig); // Current arm configuration
 		_currentSegment.read(current_segment);
 
@@ -130,8 +130,14 @@ void Task::updateHook()
 			std::cout << "Coupled control: no saturation" << std::endl;
 		}
 
-        modified_motion_command.translation = (modified_motion_command.translation*(1-smoothFactor)+last_motion_command.translation*smoothFactor)/2;
-        modified_motion_command.rotation = (modified_motion_command.rotation*(1-smoothFactor)+last_motion_command.rotation*smoothFactor)/2;
+        modified_motion_command.translation = modified_motion_command.translation*(1-smoothFactor)+last_motion_command.translation*smoothFactor;
+        modified_motion_command.rotation = modified_motion_command.rotation*(1-smoothFactor)+last_motion_command.rotation*smoothFactor;
+
+        if(motion_command.translation == 0) modified_motion_command.translation = 0;
+        if(motion_command.rotation == 0) modified_motion_command.rotation = 0;
+
+        last_motion_command.translation = modified_motion_command.translation; 
+        last_motion_command.rotation = modified_motion_command.rotation;
 
 		// Sending outputs
 		_modifiedMotionCommand.write(modified_motion_command);
