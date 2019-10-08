@@ -3,184 +3,261 @@
 #include "Task.hpp"
 
 using namespace coupled_control;
+using namespace Eigen;
 
-Task::Task(std::string const& name)
-    : TaskBase(name)
-{
-}
+Task::Task(std::string const& name) : TaskBase(name) {}
 
-Task::Task(std::string const& name, RTT::ExecutionEngine* engine)
-    : TaskBase(name, engine)
-{
-}
+Task::Task(std::string const& name, RTT::ExecutionEngine* engine) : TaskBase(name, engine) {}
 
-Task::~Task()
-{
-}
-
-/// The following lines are template definitions for the various state machine
-// hooks defined by Orocos::RTT. See Task.hpp for more detailed
-// documentation about them.
+Task::~Task() {}
 
 bool Task::configureHook()
 {
-    if (! TaskBase::configureHook())
-        return false;
+    if (!TaskBase::configureHook()) return false;
 
-	// Constant variables
-	positionCommands = _positionCommands.get();		// Position or velocity commands
-	mMaxSpeed = _mMaxSpeed.get(); 					// Maximum manipulator's joints angular speed
-	gain = _gain.get(); 							// Position control gain
-	numJoints = _numJoints.get(); 					// Number of manipulator's joints
-	modelInitialConfig = _modelInitialConfig.get(); // Initial configuration of the arm (IK model)
-	realInitialConfig = _realInitialConfig.get();	// Initial configuration of the arm (real)		
-	jointsDirection = _jointsDirection.get();	 	// Direction of each joint movements
-    smoothFactor = _smoothFactor.get();             // Smooth transitions between modified motion commands
-    if(smoothFactor < 0) smoothFactor = 0;          // No smoothing
-    else if(smoothFactor > 0.9) smoothFactor = 0.9; // Max smoothing 90%
-	negativeAngles = _negativeAngles.get();	    	// Wrapping angles between 0 and 2pi or -pi and pi
+    // Constant variables
+    position_commands = _position_commands.get();  // Position or velocity commands
+    m_max_speed = _m_max_speed.get();              // Maximum manipulator's joints angular speed
+    gain = _gain.get();                            // Position control gain
+    num_joints = _num_joints.get();                // Number of manipulator's joints
 
-	nextConfig.resize(numJoints);
-	jW.resize(numJoints);
-	configChange.resize(numJoints);
-    current_config.resize(numJoints);
+    model_initial_config =
+        _model_initial_config.get();  // Initial configuration of the arm (IK model)
+    real_initial_config = _real_initial_config.get();  // Initial configuration of the arm (real)
+    joints_direction = _joints_direction.get();        // Direction of each joint movements
 
-	for(int i = 0; i < numJoints; i++)	configChange.at(i) = jointsDirection.at(i)*(modelInitialConfig.at(i) + realInitialConfig.at(i));
+    smooth_factor = _smooth_factor.get();  // Smooth transitions between modified motion commands
+    if (smooth_factor < 0)
+        smooth_factor = 0;        // No smoothing
+    else if (smooth_factor > 0.9)
+        smooth_factor = 0.9;      // Max smoothing 90%
 
+    negative_angles = _negative_angles.get();  // Wrapping angles between 0 and 2pi or -pi and pi
 
-	saturation = 0;
+    sweep_movement_file = _sweep_movement_file.get();
 
-	std::cout << "Configuring coupled_control" << std::endl;
-	
+    next_config.resize(num_joints);
+    arm_joints_speed.resize(num_joints);
+    config_change.resize(num_joints);
+    vector_current_config.resize(num_joints);
+
+    for (int i = 0; i < num_joints; i++)
+        config_change.at(i) =
+            joints_direction.at(i) * (model_initial_config.at(i) + real_initial_config.at(i));
+
+    saturation = 0;
+
+    arm_sweep = readMatrixFile(sweep_movement_file);
+    sweep_counter = 0;
+
+    std::cout << "Configuring coupled_control" << std::endl;
+
     return true;
 }
 bool Task::startHook()
 {
-    if (! TaskBase::startHook())
-        return false;
+    if (!TaskBase::startHook()) return false;
 
-	
     return true;
 }
 void Task::updateHook()
 {
     TaskBase::updateHook();
 
-	if(_sizePath.read(sizePath) == RTT::NewData) // Rover path size
+    _trajectory_status.read(trajectory_status);
+
+    if(trajectory_status != 2)
     {
-        //Resize assignment and joints local vectors
-        assignment.resize(sizePath);
-        manipulatorConfig.resize(sizePath*numJoints);
+        if (_size_path.read(size_path) == RTT::NewData)  // Rover path size
+        {
+            // Resize assignment and joints local vectors
+            assignment.resize(size_path);
+            manipulator_config.resize(size_path * num_joints);
 
+            _assignment.read(assignment);
+            _manipulator_config.read(manipulator_config);  // Joint position along the trajectory
+        }
 
-        _assignment.read(assignment);
-        _manipulatorConfig.read(manipulatorConfig); // Joint position along the trajectory
+        if (_motion_command.read(motion_command) == RTT::NewData)  // Actual joint position
+        {
+            if (first_command == 1) _motion_command.read(last_motion_command);
+
+            _current_config.read(current_config);  // Current arm configuration
+            _current_segment.read(current_segment);
+
+            // Changing from base::samples::Joints to vector<double>
+            for (int i = 0; i < num_joints; i++)
+            {
+                base::JointState& joint(current_config[i]);
+                vector_current_config[i] = joint.position;
+            }
+
+            std::cout << "Coupled control: inputs received. Current segment:" << current_segment
+                      << std::endl;
+            // Next manipulator's joints configuration
+            coupledControl->selectNextManipulatorPosition(
+                current_segment, assignment, manipulator_config, next_config, negative_angles);
+
+            // Range input angles from 0 to 2pi
+
+            std::cout << "Current configuration: ";
+
+            for (int i = 0; i < num_joints; i++)
+            {
+                std::cout << vector_current_config.at(i) << "  ";
+                vector_current_config.at(i) = coupledControl->constrainAngle(
+                    joints_direction.at(i) * vector_current_config.at(i), negative_angles);
+                vector_current_config.at(i) = coupledControl->constrainAngle(
+                    vector_current_config.at(i) - config_change.at(i), negative_angles);
+            }
+            std::cout << endl;
+
+            // Position control
+            coupledControl->manipulatorMotionControl(
+                gain, saturation, m_max_speed, next_config, vector_current_config, arm_joints_speed);
+
+            modified_motion_command = motion_command;
+            if (saturation == 1)
+            {
+                // Maximum manipulator's joints speed
+                max_arm_speed = coupledControl->findMaxValue(arm_joints_speed);
+
+                // Rover motion command is modified
+                coupledControl->modifyMotionCommand(m_max_speed,
+                                                    abs(arm_joints_speed.at(max_arm_speed)),
+                                                    arm_joints_speed,
+                                                    motion_command,
+                                                    modified_motion_command);
+
+                saturation = 0;
+                first_command = 0;
+                std::cout << "Coupled control: saturation" << std::endl;
+            }
+            else
+            {
+                // Rover motion command is not modified
+                std::cout << "Conversion relation: " << 1 << std::endl;
+                std::cout << "Coupled control: no saturation" << std::endl;
+            }
+
+            modified_motion_command.translation =
+                modified_motion_command.translation * (1 - smooth_factor)
+                + last_motion_command.translation * smooth_factor;
+            modified_motion_command.rotation = modified_motion_command.rotation * (1 - smooth_factor)
+                                               + last_motion_command.rotation * smooth_factor;
+
+            if (motion_command.translation == 0) modified_motion_command.translation = 0;
+            if (motion_command.rotation == 0) modified_motion_command.rotation = 0;
+
+            last_motion_command.translation = modified_motion_command.translation;
+            last_motion_command.rotation = modified_motion_command.rotation;
+
+            // Sending outputs
+            _modified_motion_command.write(modified_motion_command);
+
+            if (position_commands == 0)
+            {
+                // Changing from vector<double> to base::commands::Joints (speeds)
+                std::vector<std::string> names{
+                    "ARM_JOINT_1", "ARM_JOINT_2", "ARM_JOINT_3", "ARM_JOINT_4", "ARM_JOINT_5"};
+                base::commands::Joints velocity_command(
+                    base::commands::Joints::Speeds(arm_joints_speed, names));
+                velocity_command.time = base::Time::now();
+                _manipulator_command.write(velocity_command);
+            }
+            else
+            {
+                std::cout << "Manipulator configuration goal: ";
+                for (int i = 0; i < num_joints; i++)
+                {
+                    next_config.at(i) = coupledControl->constrainAngle(
+                        next_config.at(i) + config_change.at(i), negative_angles);
+                    next_config.at(i) = coupledControl->constrainAngle(
+                        joints_direction.at(i) * next_config.at(i), negative_angles);
+                    std::cout << next_config.at(i) << "  ";
+                }
+                std::cout << endl;
+
+                // Changing from vector<double> to base::commands::Joints
+                std::vector<std::string> names{
+                    "ARM_JOINT_1", "ARM_JOINT_2", "ARM_JOINT_3", "ARM_JOINT_4", "ARM_JOINT_5"};
+                base::commands::Joints position_command(
+                    base::commands::Joints::Positions(next_config, names));
+                position_command.time = base::Time::now();
+                _manipulator_command.write(position_command);
+            }
+
+            std::cout << "Motion command. Translation: " << modified_motion_command.translation
+                      << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
+        }
     }
+    else
+    {
+        if(sweep_counter < arm_sweep.size())
+        {
+            _current_config.read(current_config);  // Current arm configuration
+            
+            // Changing from base::samples::Joints to vector<double>
+            for (int i = 0; i < num_joints; i++)
+            {
+                base::JointState& joint(current_config[i]);
+                vector_current_config[i] = joint.position;
+                double config_reached = arm_sweep[sweep_counter][i]/vector_current_config[i];
+                if(config_reached < 1.001 && config_reached > 0.999) 
+                    sweep_counter++;
+            }
 
-	if(_motionCommand.read(motion_command) == RTT::NewData) // Actual joint position 
-	{
-        if(firstCommand == 1) _motionCommand.read(last_motion_command);
-
-		_currentConfig.read(currentConfig); // Current arm configuration
-		_currentSegment.read(current_segment);
-
-		//Changing from base::samples::Joints to vector<double>
-		for(int i = 0; i < numJoints; i++)
-		{
-			base::JointState& joint(currentConfig[i]);
-		    current_config[i] = joint.position;
-		}
-
-		std::cout << "Coupled control: inputs received. Current segment:" << current_segment << std::endl;
-		// Next manipulator's joints configuration
-		coupledControl->selectNextManipulatorPosition(current_segment, assignment, manipulatorConfig, nextConfig, negativeAngles);
-				
-		// Range input angles from 0 to 2pi
-
-		std::cout << "Current configuration: ";
-
-		for(int i = 0; i < numJoints; i++)
-		{
-			std::cout << current_config.at(i) << "  ";
-			current_config.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*current_config.at(i), negativeAngles);
-			current_config.at(i) = coupledControl->constrainAngle(current_config.at(i)-configChange.at(i), negativeAngles);
-		}
-		std::cout << endl;
-
-		// Position control
-		coupledControl->manipulatorMotionControl(gain, saturation, mMaxSpeed, nextConfig, current_config, jW);
-
-		modified_motion_command = motion_command;
-		if(saturation == 1)
-		{
-			// Maximum manipulator's joints speed
-			maxJW = coupledControl->findMaxValue(jW);
-
-			// Rover motion command is modified 
-			coupledControl->modifyMotionCommand(mMaxSpeed, abs(jW.at(maxJW)), jW, motion_command, modified_motion_command);
-
-			saturation = 0;
-            firstCommand = 0;
-			std::cout << "Coupled control: saturation" << std::endl;
-		}
-		else
-		{
-			// Rover motion command is not modified 
-			std::cout << "Conversion relation: " << 1 << std::endl;
-			std::cout << "Coupled control: no saturation" << std::endl;
-		}
-
-        modified_motion_command.translation = modified_motion_command.translation*(1-smoothFactor)+last_motion_command.translation*smoothFactor;
-        modified_motion_command.rotation = modified_motion_command.rotation*(1-smoothFactor)+last_motion_command.rotation*smoothFactor;
-
-        if(motion_command.translation == 0) modified_motion_command.translation = 0;
-        if(motion_command.rotation == 0) modified_motion_command.rotation = 0;
-
-        last_motion_command.translation = modified_motion_command.translation; 
-        last_motion_command.rotation = modified_motion_command.rotation;
-
-		// Sending outputs
-		_modifiedMotionCommand.write(modified_motion_command);
-
-		if(positionCommands == 0) 
-		{
-			//Changing from vector<double> to base::commands::Joints (speeds)
-            std::vector<std::string> names{"ARM_JOINT_1","ARM_JOINT_2","ARM_JOINT_3","ARM_JOINT_4","ARM_JOINT_5"};
-			base::commands::Joints velocityCommand(base::commands::Joints::Speeds(jW,names));
-            velocityCommand.time = base::Time::now();
-			_manipulatorCommand.write(velocityCommand);
-		}
-		else 
-		{
-		    std::cout << "Manipulator configuration goal: ";
-			for(int i = 0; i < numJoints; i++)
-				{
-					nextConfig.at(i) = coupledControl->constrainAngle(nextConfig.at(i)+configChange.at(i), negativeAngles);
-					nextConfig.at(i) = coupledControl->constrainAngle(jointsDirection.at(i)*nextConfig.at(i), negativeAngles);
-			        std::cout << nextConfig.at(i) << "  ";
-				}
-		    std::cout << endl;
-
-			//Changing from vector<double> to base::commands::Joints (speeds)
-            std::vector<std::string> names{"ARM_JOINT_1","ARM_JOINT_2","ARM_JOINT_3","ARM_JOINT_4","ARM_JOINT_5"};
-			base::commands::Joints positionCommand(base::commands::Joints::Positions(nextConfig,names));
-            positionCommand.time = base::Time::now();
-			_manipulatorCommand.write(positionCommand);
-			
-		}
-
-		std::cout << "Motion command. Translation: " << modified_motion_command.translation << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
-	}
+            next_config = arm_sweep[sweep_counter];
+            // Changing from vector<double> to base::commands::Joints (speeds)
+            std::vector<std::string> names{
+                "ARM_JOINT_1", "ARM_JOINT_2", "ARM_JOINT_3", "ARM_JOINT_4", "ARM_JOINT_5"};
+            base::commands::Joints position_command(
+                base::commands::Joints::Positions(next_config, names));
+            position_command.time = base::Time::now();
+            _manipulator_command.write(position_command);
+        }
+    }
 }
-void Task::errorHook()
+void Task::errorHook() { TaskBase::errorHook(); }
+void Task::stopHook() { TaskBase::stopHook(); }
+void Task::cleanupHook() { TaskBase::cleanupHook(); }
+
+std::vector<std::vector<double>> Task::readMatrixFile(std::string movement_file)
 {
-    TaskBase::errorHook();
-}
-void Task::stopHook()
-{
-    TaskBase::stopHook();
-}
-void Task::cleanupHook()
-{
-    TaskBase::cleanupHook();
+    LOG_DEBUG_S << "Reading movement " << movement_file;
+    std::vector<std::vector<double>> movement_matrix;
+    std::string line;
+    std::ifstream e_file(movement_file.c_str(), std::ios::in);
+    double n_row = 0, n_col = 0;
+    std::vector<double> row;
+
+    if (e_file.is_open())
+    {
+        while (std::getline(e_file, line))
+        {
+            std::stringstream ss(line);
+            std::string cell;
+            while (std::getline(ss, cell, ' '))
+            {
+                double val;
+                std::stringstream numeric_value(cell);
+                numeric_value >> val;
+                row.push_back(val);
+                n_col++;
+            }
+            movement_matrix.push_back(row);
+            row.clear();
+            n_row++;
+        }
+        e_file.close();
+
+        n_col /= n_row;
+        LOG_DEBUG_S << "COUPLED CONTROL: Movement of " << n_col << " x " << n_row << " loaded.";
+    }
+    else
+    {
+        LOG_DEBUG_S << "COUPLED_CONTROL: Problem opening the file";
+        return movement_matrix;
+    }
+    return movement_matrix;
 }
