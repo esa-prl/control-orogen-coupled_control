@@ -50,7 +50,7 @@ bool Task::configureHook()
     arm_sweep = readMatrixFile(sweep_movement_file);
     sweep_counter = 0;
 
-    std::cout << "Configuring coupled_control" << std::endl;
+    LOG_INFO_S << "Configuring coupled_control" << std::endl;
 
     return true;
 }
@@ -92,7 +92,7 @@ void Task::updateHook()
                 vector_current_config[i] = joint.position;
             }
 
-            std::cout << "Coupled control: inputs received. Current segment:" << current_segment
+            LOG_INFO_S << "Coupled control: inputs received. Current segment:" << current_segment
                       << std::endl;
             // Next manipulator's joints configuration
             coupledControl->selectNextManipulatorPosition(
@@ -131,13 +131,13 @@ void Task::updateHook()
 
                 saturation = 0;
                 first_command = 0;
-                std::cout << "Coupled control: saturation" << std::endl;
+                LOG_INFO_S << "Coupled control: saturation" << std::endl;
             }
             else
             {
                 // Rover motion command is not modified
-                std::cout << "Conversion relation: " << 1 << std::endl;
-                std::cout << "Coupled control: no saturation" << std::endl;
+                LOG_INFO_S << "Conversion relation: " << 1 << std::endl;
+                LOG_INFO_S << "Coupled control: no saturation" << std::endl;
             }
 
             modified_motion_command.translation =
@@ -187,7 +187,7 @@ void Task::updateHook()
                 _manipulator_command.write(position_command);
             }
 
-            std::cout << "Motion command. Translation: " << modified_motion_command.translation
+            LOG_INFO_S << "Motion command. Translation: " << modified_motion_command.translation
                       << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
         }
     }
@@ -256,7 +256,7 @@ std::vector<std::vector<double>> Task::readMatrixFile(std::string movement_file)
     }
     else
     {
-        LOG_DEBUG_S << "COUPLED_CONTROL: Problem opening the file";
+        LOG_WARN_S << "COUPLED_CONTROL: Problem opening the movement file";
         return movement_matrix;
     }
     return movement_matrix;
