@@ -50,7 +50,7 @@ bool Task::configureHook()
     arm_sweep = readMatrixFile(sweep_movement_file);
     sweep_counter = 0;
 
-    LOG_INFO_S << "Configuring coupled_control" << std::endl;
+    LOG_INFO_S << "Configured coupled_control" << std::endl;
 
     return true;
 }
@@ -192,29 +192,47 @@ void Task::updateHook()
         }
     }
     else
-    {
-        if(sweep_counter < arm_sweep.size())
+    { 
+        if(_current_config.read(current_config) == RTT::NewData)  // Current arm configuration
         {
-            _current_config.read(current_config);  // Current arm configuration
-            
-            // Changing from base::samples::Joints to vector<double>
-            for (int i = 0; i < num_joints; i++)
-            {
-                base::JointState& joint(current_config[i]);
-                vector_current_config[i] = joint.position;
-                double config_reached = arm_sweep[sweep_counter][i]/vector_current_config[i];
-                if(config_reached < 1.001 && config_reached > 0.999) 
-                    sweep_counter++;
-            }
 
-            next_config = arm_sweep[sweep_counter];
-            // Changing from vector<double> to base::commands::Joints (speeds)
-            std::vector<std::string> names{
-                "ARM_JOINT_1", "ARM_JOINT_2", "ARM_JOINT_3", "ARM_JOINT_4", "ARM_JOINT_5"};
-            base::commands::Joints position_command(
-                base::commands::Joints::Positions(next_config, names));
-            position_command.time = base::Time::now();
-            _manipulator_command.write(position_command);
+            if(sweep_counter < arm_sweep.size())
+            {
+                bool config_reached = true;
+                // Changing from base::samples::Joints to vector<double>
+                std::cout<<"Config ratios: "; 
+                for (int i = 0; i < num_joints; i++)
+                {
+                    base::JointState& joint(current_config[i]);
+                    vector_current_config[i] = joint.position;
+                    double config_ratio = arm_sweep[sweep_counter][i]/vector_current_config[i];
+                    std::cout<<config_ratio<<" ";
+                    if((config_ratio > 1.01 || config_ratio < 0.99)&&(abs(vector_current_config[i])>0.05)) 
+                        config_reached = false;
+                }
+                std::cout<<std::endl;
+                if(config_reached) sweep_counter++;
+
+                next_config = arm_sweep[sweep_counter];
+
+                std::cout<<"Received: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<"]"<<std::endl; 
+                std::cout<<"Sending: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<"]"<<std::endl;
+
+                // Changing from vector<double> to base::commands::Joints (speeds)
+                std::vector<std::string> names{
+                    "ARM_JOINT_1", "ARM_JOINT_2", "ARM_JOINT_3", "ARM_JOINT_4", "ARM_JOINT_5"};
+                base::commands::Joints position_command(
+                    base::commands::Joints::Positions(next_config, names));
+                position_command.time = base::Time::now();
+                _manipulator_command.write(position_command);
+                _motion_command.read(motion_command);
+                base::commands::Motion2D a;
+                a = motion_command;
+                a.translation = 0;
+                a.rotation = 0;
+                _modified_motion_command.write(a);
+
+            }
         }
     }
 }
@@ -252,7 +270,7 @@ std::vector<std::vector<double>> Task::readMatrixFile(std::string movement_file)
         e_file.close();
 
         n_col /= n_row;
-        LOG_DEBUG_S << "COUPLED CONTROL: Movement of " << n_col << " x " << n_row << " loaded.";
+        LOG_INFO_S << "COUPLED CONTROL: Movement of " << n_col << " x " << n_row << " loaded.";
     }
     else
     {
