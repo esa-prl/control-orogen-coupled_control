@@ -29,8 +29,8 @@ bool Task::configureHook()
     smooth_factor = _smooth_factor.get();  // Smooth transitions between modified motion commands
     if (smooth_factor < 0)
         smooth_factor = 0;        // No smoothing
-    else if (smooth_factor > 0.9)
-        smooth_factor = 0.9;      // Max smoothing 90%
+    else if (smooth_factor > 0.95)
+        smooth_factor = 0.95;      // Max smoothing 90%
 
     negative_angles = _negative_angles.get();  // Wrapping angles between 0 and 2pi or -pi and pi
 
@@ -49,6 +49,7 @@ bool Task::configureHook()
 
     arm_sweep = readMatrixFile(sweep_movement_file);
     sweep_counter = 0;
+    sweeping = false;
 
     LOG_INFO_S << "Configured coupled_control" << std::endl;
 
@@ -66,7 +67,7 @@ void Task::updateHook()
 
     _trajectory_status.read(trajectory_status);
 
-    if(trajectory_status != 2)
+    if(trajectory_status != 2 && !sweeping)
     {
         if (_size_path.read(size_path) == RTT::NewData)  // Rover path size
         {
@@ -193,6 +194,7 @@ void Task::updateHook()
     }
     else
     { 
+        sweeping = true;
         if(_current_config.read(current_config) == RTT::NewData)  // Current arm configuration
         {
 

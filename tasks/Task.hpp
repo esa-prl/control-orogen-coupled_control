@@ -61,6 +61,7 @@ class Task : public TaskBase
 
     std::vector<std::vector<double>> arm_sweep;
     int sweep_counter;
+    bool sweeping;
 
   public:
     Task(std::string const& name = "coupled_control::Task");
