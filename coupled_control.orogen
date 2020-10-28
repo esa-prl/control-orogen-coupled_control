@@ -3,6 +3,7 @@ version "0.1"
 
 using_library "coupled_control"
 
+import_types_from "motion_planning/motion_planningTypes.hpp"
 import_types_from "coupled_controlTypes.hpp"
 import_types_from "std"
 import_types_from "base"
@@ -20,7 +21,7 @@ task_context "Task" do
 	property "joints_direction","std/vector<double>"
 	property "smooth_factor", "double"
 	property "negative_angles", "int"
-    property "sweep_movement_file", "std/string"
+    property "final_movement_file", "std/string"
 	
     input_port("motion_command", "base/commands/Motion2D")
 	input_port("current_segment", "int")
@@ -28,7 +29,7 @@ task_context "Task" do
 
 	input_port("size_path","int")
 	input_port("assignment", "std/vector<int>")
-	input_port("manipulator_config", "std/vector<double>")
+	input_port("arm_profile", "motion_planning/ArmProfile")
 
 	input_port("current_config", "/base/samples/Joints")
 

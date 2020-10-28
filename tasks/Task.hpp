@@ -33,7 +33,7 @@ class Task : public TaskBase
     std::vector<double> joints_direction;
     double smooth_factor;
     int negative_angles;
-    std::string sweep_movement_file;
+    std::string final_movement_file;
 
     // Input variables
     base::commands::Motion2D motion_command;
@@ -42,7 +42,7 @@ class Task : public TaskBase
 
     int size_path;
     std::vector<int> assignment;
-    std::vector<double> manipulator_config;
+    motion_planning::ArmProfile arm_profile;
 
     base::samples::Joints current_config;
 
@@ -51,7 +51,7 @@ class Task : public TaskBase
 
     // Local variables
     std::vector<double> next_config;
-    std::vector<float> arm_joints_speed;
+    std::vector<double> arm_joints_speed;
     int saturation;
     int max_arm_speed;
     std::vector<double> config_change;
@@ -59,9 +59,9 @@ class Task : public TaskBase
     base::commands::Motion2D last_motion_command;
     int first_command = 1;
 
-    std::vector<std::vector<double>> arm_sweep;
-    int sweep_counter;
-    bool sweeping;
+    std::vector<std::vector<double>> arm_final_movement;
+    int final_movement_counter;
+    bool performing_final_movement;
 
   public:
     Task(std::string const& name = "coupled_control::Task");
