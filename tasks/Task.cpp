@@ -16,15 +16,16 @@ bool Task::configureHook()
     if (!TaskBase::configureHook()) return false;
 
     // Constant variables
+    is_vector_double = _is_vector_double.get();    // Sending std::vector::double or base::samples::Joints
     position_commands = _position_commands.get();  // Position or velocity commands
     m_max_speed = _m_max_speed.get();              // Maximum manipulator's joints angular speed
     gain = _gain.get();                            // Position control gain
-    num_joints = _num_joints.get();                // Number of manipulator's joints
+    arm_num_joints = _arm_num_joints.get();                // Number of manipulator's joints
 
-    model_initial_config =
-        _model_initial_config.get();  // Initial configuration of the arm (IK model)
-    real_initial_config = _real_initial_config.get();  // Initial configuration of the arm (real)
-    joints_direction = _joints_direction.get();        // Direction of each joint movements
+    arm_model_initial_config =
+        _arm_model_initial_config.get();  // Initial configuration of the arm (IK model)
+    arm_real_initial_config = _arm_real_initial_config.get();  // Initial configuration of the arm (real)
+    arm_joints_direction = _arm_joints_direction.get();        // Direction of each joint movements
 
     smooth_factor = _smooth_factor.get();  // Smooth transitions between modified motion commands
     if (smooth_factor < 0)
@@ -37,14 +38,14 @@ bool Task::configureHook()
     final_movement_file = _final_movement_file.get();
 
 
-    next_config.resize(num_joints);
-    arm_joints_speed.resize(num_joints);
-    config_change.resize(num_joints);
-    vector_current_config.resize(num_joints);
+    next_config.resize(arm_num_joints);
+    arm_joints_speed.resize(arm_num_joints);
+    config_change.resize(arm_num_joints);
+    vector_current_config.resize(arm_num_joints);
 
-    for (int i = 0; i < num_joints; i++)
+    for (int i = 0; i < arm_num_joints; i++)
         config_change.at(i) =
-            joints_direction.at(i) * (model_initial_config.at(i) + real_initial_config.at(i));
+            arm_joints_direction.at(i) * (arm_model_initial_config.at(i) + arm_real_initial_config.at(i));
 
     saturation = 0;
 
@@ -91,16 +92,22 @@ void Task::updateHook()
         if (_motion_command.read(motion_command) == RTT::NewData)  // Actual joint position
         {
             if (first_command == 1) _motion_command.read(last_motion_command);
-
-            _current_config.read(current_config);  // Current arm configuration
+    
+            if(!is_vector_double)
+            {
+                _current_config.read(current_config);  // Current arm configuration
+                // Changing from base::samples::Joints to vector<double>
+                for (int i = 0; i < arm_num_joints; i++)
+                {
+                    base::JointState& joint(current_config[i]);
+                    vector_current_config[i] = joint.position;
+                }
+            }
+            else
+                _current_config_vector_double.read(vector_current_config);  // Current arm configuration
+                
             _current_segment.read(current_segment);
 
-            // Changing from base::samples::Joints to vector<double>
-            for (int i = 0; i < num_joints; i++)
-            {
-                base::JointState& joint(current_config[i]);
-                vector_current_config[i] = joint.position;
-            }
 
             LOG_INFO_S << "Coupled control: inputs received. Current segment:" << current_segment
                       << std::endl;
@@ -110,11 +117,11 @@ void Task::updateHook()
 
             // Range input angles from 0 to 2pi
 
-            for (int i = 0; i < num_joints; i++)
+            for (int i = 0; i < arm_num_joints; i++)
             {
                 std::cout << vector_current_config.at(i) << "  ";
                 vector_current_config.at(i) = coupledControl->constrainAngle(
-                    joints_direction.at(i) * vector_current_config.at(i), negative_angles);
+                    arm_joints_direction.at(i) * vector_current_config.at(i), negative_angles);
                 vector_current_config.at(i) = coupledControl->constrainAngle(
                     vector_current_config.at(i) - config_change.at(i), negative_angles);
             }
@@ -161,17 +168,19 @@ void Task::updateHook()
                 base::commands::Joints velocity_command(
                     base::commands::Joints::Speeds(aux_arm_joints_speed, names));
                 velocity_command.time = base::Time::now();
-                _manipulator_command.write(velocity_command);
+                if(is_vector_double)
+                    _manipulator_command_vector_double.write(arm_joints_speed);
+                else
+                    _manipulator_command.write(velocity_command);    
             }
             else
             {
-                std::vector<std::string> names;
-                for (int i = 0; i < num_joints; i++)
+                for (int i = 0; i < arm_num_joints; i++)
                 {
                     next_config.at(i) = coupledControl->constrainAngle(
                         next_config.at(i) + config_change.at(i), negative_angles);
                     next_config.at(i) = coupledControl->constrainAngle(
-                        joints_direction.at(i) * next_config.at(i), negative_angles);
+                        arm_joints_direction.at(i) * next_config.at(i), negative_angles);
 
                     names.push_back(std::string("ARM_JOINT_%i",i));
                 }
@@ -180,7 +189,10 @@ void Task::updateHook()
                 base::commands::Joints position_command(
                     base::commands::Joints::Positions(next_config, names));
                 position_command.time = base::Time::now();
-                _manipulator_command.write(position_command);
+                if(is_vector_double)
+                    _manipulator_command_vector_double.write(next_config);
+                else
+                    _manipulator_command.write(position_command);    
             }
 
             LOG_INFO_S << "Motion command. Translation: " << modified_motion_command.translation
@@ -197,7 +209,7 @@ void Task::updateHook()
             {
                 bool config_reached = true;
                 // Changing from base::samples::Joints to vector<double>
-                for (int i = 0; i < num_joints; i++)
+                for (int i = 0; i < arm_num_joints; i++)
                 {
                     base::JointState& joint(current_config[i]);
                     vector_current_config[i] = joint.position;
@@ -216,7 +228,10 @@ void Task::updateHook()
                 base::commands::Joints position_command(
                     base::commands::Joints::Positions(next_config, names));
                 position_command.time = base::Time::now();
-                _manipulator_command.write(position_command);
+                if(is_vector_double)
+                    _manipulator_command_vector_double.write(next_config);
+                else
+                    _manipulator_command.write(position_command);    
                 _motion_command.read(motion_command);
                 base::commands::Motion2D stop;
                 stop = motion_command;

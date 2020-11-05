@@ -7,18 +7,21 @@ import_types_from "motion_planning/motion_planningTypes.hpp"
 import_types_from "coupled_controlTypes.hpp"
 import_types_from "std"
 import_types_from "base"
+import_types_from "motion_planning/motion_planningTypes.hpp"
+
 
 task_context "Task" do
     
     needs_configuration
 
+    property "is_vector_double", "bool"
     property "position_commands","int"
     property "m_max_speed", "double"
 	property "gain", "double"
-	property "num_joints", "int"
-	property "model_initial_config","std/vector<double>"
-	property "real_initial_config","std/vector<double>"
-	property "joints_direction","std/vector<double>"
+	property "arm_num_joints", "int"
+	property "arm_model_initial_config","std/vector<double>"
+	property "arm_real_initial_config","std/vector<double>"
+	property "arm_joints_direction","std/vector<double>"
 	property "smooth_factor", "double"
 	property "negative_angles", "int"
     property "final_movement_file", "std/string"
@@ -32,9 +35,11 @@ task_context "Task" do
 	input_port("arm_profile", "motion_planning/ArmProfile")
 
 	input_port("current_config", "/base/samples/Joints")
+	input_port("current_config_vector_double", "std/vector<double>")
 
     output_port("modified_motion_command", "base/commands/Motion2D")
 	output_port("manipulator_command", "base/commands/Joints")
+	output_port("manipulator_command_vector_double", "std/vector<double>")
 
 	port_driven
 end

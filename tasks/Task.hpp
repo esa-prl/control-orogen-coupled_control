@@ -23,14 +23,15 @@ class Task : public TaskBase
   protected:
     coupled_control::coupledControl* coupledControl;
 
-    // Property variables
+    // Property variables.
+    bool is_vector_double;
     int position_commands;
     double m_max_speed;
     double gain;
-    int num_joints;
-    std::vector<double> model_initial_config;
-    std::vector<double> real_initial_config;
-    std::vector<double> joints_direction;
+    int arm_num_joints;
+    std::vector<double> arm_model_initial_config;
+    std::vector<double> arm_real_initial_config;
+    std::vector<double> arm_joints_direction;
     double smooth_factor;
     int negative_angles;
     std::string final_movement_file;
