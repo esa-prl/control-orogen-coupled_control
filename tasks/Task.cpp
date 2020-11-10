@@ -48,7 +48,7 @@ bool Task::configureHook()
             arm_joints_direction.at(i) * (arm_model_initial_config.at(i) + arm_real_initial_config.at(i));
 
     saturation = 0;
-
+    
     if(final_movement_file.size() > 0)
     {
         arm_final_movement = readMatrixFile(final_movement_file);
@@ -60,6 +60,8 @@ bool Task::configureHook()
         final_movement_counter = -1;
         performing_final_movement = false;
     }
+
+    received_arm_profile = false;
 
     LOG_INFO_S << "Configured coupled_control" << std::endl;
 
@@ -77,19 +79,16 @@ void Task::updateHook()
 
     _trajectory_status.read(trajectory_status);
 
-    if(trajectory_status != 2 && final_movement_counter < 0)
-    {
-        if (_size_path.read(size_path) == RTT::NewData)  // Rover path size
-        {
-            // Resize joints local vectors
-            arm_profile.position.resize(size_path);
-            for(int i = 0; i < size_path; i++)
-                arm_profile.position[i].resize(num_joints);
+    //if(trajectory_status != 2 && final_movement_counter < 0)
+    //{
 
-            _arm_profile.read(arm_profile);  // Joint position along the trajectory
+
+        if (_arm_profile.read(arm_profile) == RTT::NewData)  // Joint position along the trajectory
+        {
+            received_arm_profile = true;
         }
 
-        if (_motion_command.read(motion_command) == RTT::NewData)  // Actual joint position
+        if (_motion_command.read(motion_command) && received_arm_profile)  // Actual joint position
         {
             if (first_command == 1) _motion_command.read(last_motion_command);
     
@@ -105,9 +104,7 @@ void Task::updateHook()
             }
             else
                 _current_config_vector_double.read(vector_current_config);  // Current arm configuration
-                
             _current_segment.read(current_segment);
-
 
             LOG_INFO_S << "Coupled control: inputs received. Current segment:" << current_segment
                       << std::endl;
@@ -119,7 +116,6 @@ void Task::updateHook()
 
             for (int i = 0; i < arm_num_joints; i++)
             {
-                std::cout << vector_current_config.at(i) << "  ";
                 vector_current_config.at(i) = coupledControl->constrainAngle(
                     arm_joints_direction.at(i) * vector_current_config.at(i), negative_angles);
                 vector_current_config.at(i) = coupledControl->constrainAngle(
@@ -129,13 +125,15 @@ void Task::updateHook()
             // Position control
 
             // Rover motion command is modified
+            modified_motion_command = motion_command;
+
             coupledControl->modifyMotionCommand(gain,
                                                 next_config,
                                                 vector_current_config,
                                                 m_max_speed,
                                                 arm_joints_speed,
                                                 modified_motion_command);
-
+            
             first_command = 0;
 
             modified_motion_command.translation =
@@ -153,13 +151,15 @@ void Task::updateHook()
             // Sending outputs
             _modified_motion_command.write(modified_motion_command);
 
+            std::vector<std::string> names;
+
+
             if (position_commands == 0)
             {
                 // Changing from vector<double> to base::commands::Joints (speeds)
-                std::vector<std::string> names;
                 std::vector<float> aux_arm_joints_speed;
 
-                for (int i = 0; i < num_joints; i++)
+                for (int i = 0; i < arm_num_joints; i++)
                 {
                     names.push_back(std::string("ARM_JOINT_%i",i));
                     aux_arm_joints_speed.push_back((float)arm_joints_speed[i]);
@@ -198,7 +198,7 @@ void Task::updateHook()
             LOG_INFO_S << "Motion command. Translation: " << modified_motion_command.translation
                       << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
         }
-    }
+    /*}
     else if(performing_final_movement)
     { 
         if(final_movement_counter < 0) final_movement_counter = 0;
@@ -223,7 +223,7 @@ void Task::updateHook()
 
                 // Changing from vector<double> to base::commands::Joints
                 std::vector<std::string> names;
-                for(int i = 0; i < num_joints; i++)
+                for(int i = 0; i < arm_num_joints; i++)
                     names.push_back(std::string("ARM_JOINT_%i",i));
                 base::commands::Joints position_command(
                     base::commands::Joints::Positions(next_config, names));
@@ -241,7 +241,7 @@ void Task::updateHook()
 
             }
         }
-    }
+    }*/
 }
 void Task::errorHook() { TaskBase::errorHook(); }
 void Task::stopHook() { TaskBase::stopHook(); }

@@ -63,6 +63,7 @@ class Task : public TaskBase
     std::vector<std::vector<double>> arm_final_movement;
     int final_movement_counter;
     bool performing_final_movement;
+    bool received_arm_profile;
 
   public:
     Task(std::string const& name = "coupled_control::Task");

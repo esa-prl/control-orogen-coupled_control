@@ -41,6 +41,6 @@ task_context "Task" do
 	output_port("manipulator_command", "base/commands/Joints")
 	output_port("manipulator_command_vector_double", "std/vector<double>")
 
-	port_driven
+	periodic 0.05
 end
 
