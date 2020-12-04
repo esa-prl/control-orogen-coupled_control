@@ -61,8 +61,10 @@ class Task : public TaskBase
     int first_command = 1;
 
     std::vector<std::vector<double>> arm_final_movement;
-    int final_movement_counter;
-    bool performing_final_movement;
+    motion_planning::ArmProfile final_movement_matrix;
+    
+    int final_movement_counter = -1;
+    int performing_final_movement;
     bool received_arm_profile;
 
   public:

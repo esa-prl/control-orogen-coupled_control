@@ -25,6 +25,7 @@ task_context "Task" do
 	property "smooth_factor", "double"
 	property "negative_angles", "int"
     property "final_movement_file", "std/string"
+    property "performing_final_movement", "int"
 	
     input_port("motion_command", "base/commands/Motion2D")
 	input_port("current_segment", "int")
@@ -33,6 +34,7 @@ task_context "Task" do
 	input_port("size_path","int")
 	input_port("assignment", "std/vector<int>")
 	input_port("arm_profile", "motion_planning/ArmProfile")
+	input_port("final_movement_matrix_port", "motion_planning/ArmProfile")
 
 	input_port("current_config", "/base/samples/Joints")
 	input_port("current_config_vector_double", "std/vector<double>")

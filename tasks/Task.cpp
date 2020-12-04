@@ -21,6 +21,7 @@ bool Task::configureHook()
     m_max_speed = _m_max_speed.get();              // Maximum manipulator's joints angular speed
     gain = _gain.get();                            // Position control gain
     arm_num_joints = _arm_num_joints.get();                // Number of manipulator's joints
+    performing_final_movement = _performing_final_movement.get();                 //Variable to check arm final movement input type: it's 0 if it's from a file, 1 if it's from a matrix given by the arm planner 
 
     arm_model_initial_config =
         _arm_model_initial_config.get();  // Initial configuration of the arm (IK model)
@@ -34,10 +35,7 @@ bool Task::configureHook()
         smooth_factor = 0.95;      // Max smoothing 90%
 
     negative_angles = _negative_angles.get();  // Wrapping angles between 0 and 2pi or -pi and pi
-
-    final_movement_file = _final_movement_file.get();
-
-
+  
     next_config.resize(arm_num_joints);
     arm_joints_speed.resize(arm_num_joints);
     config_change.resize(arm_num_joints);
@@ -48,19 +46,7 @@ bool Task::configureHook()
             arm_joints_direction.at(i) * (arm_model_initial_config.at(i) + arm_real_initial_config.at(i));
 
     saturation = 0;
-    
-    if(final_movement_file.size() > 0)
-    {
-        arm_final_movement = readMatrixFile(final_movement_file);
-        final_movement_counter = -1;
-        performing_final_movement = true;
-    }
-    else
-    {
-        final_movement_counter = -1;
-        performing_final_movement = false;
-    }
-
+  
     received_arm_profile = false;
 
     LOG_INFO_S << "Configured coupled_control" << std::endl;
@@ -78,9 +64,8 @@ void Task::updateHook()
     TaskBase::updateHook();
 
     _trajectory_status.read(trajectory_status);
-
-    //if(trajectory_status != 2 && final_movement_counter < 0)
-    //{
+    if(trajectory_status != 2 && final_movement_counter < 0)
+    {
 
 
         if (_arm_profile.read(arm_profile) == RTT::NewData)  // Joint position along the trajectory
@@ -113,7 +98,6 @@ void Task::updateHook()
                 current_segment, &arm_profile.position, &next_config, negative_angles);
 
             // Range input angles from 0 to 2pi
-
             for (int i = 0; i < arm_num_joints; i++)
             {
                 vector_current_config.at(i) = coupledControl->constrainAngle(
@@ -198,33 +182,120 @@ void Task::updateHook()
             LOG_INFO_S << "Motion command. Translation: " << modified_motion_command.translation
                       << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
         }
-    /*}
-    else if(performing_final_movement)
+    
+    }
+    
+    else if(performing_final_movement == 1 || performing_final_movement == 2)
     { 
-        if(final_movement_counter < 0) final_movement_counter = 0;
-        if(_current_config.read(current_config) == RTT::NewData)  // Current arm configuration
+        if(final_movement_counter < 0)
         {
-
-            if(final_movement_counter < arm_final_movement.size())
+            
+            // If the arm final movement is obtained from a file
+            if (performing_final_movement == 1)
             {
-                bool config_reached = true;
-                // Changing from base::samples::Joints to vector<double>
+                final_movement_file = _final_movement_file.get();        
+                arm_final_movement = readMatrixFile(final_movement_file);
+
+            }
+            // If the arm final movement is obtained from a matrix given by  the arm planner
+            else if (performing_final_movement == 2) 
+            {
+                if (_final_movement_matrix_port.read(final_movement_matrix) == RTT::NewData)  // Final movement matrix
+                {
+                    // Initializing arm_final_movement_matrix  LAURA
+                    arm_final_movement.resize(arm_num_joints);        
+        
+                    for (int i = 0; i < arm_num_joints; i++)
+        
+                        arm_final_movement[i].resize(final_movement_matrix.position.size());
+
+
+                    arm_final_movement = final_movement_matrix.position;
+                }   
+            }
+           
+            final_movement_counter = 0;
+        }
+
+        if(!is_vector_double)
+        {
+            _current_config.read(current_config);  // Current arm configuration
+            // Changing from base::samples::Joints to vector<double>
+            for (int i = 0; i < arm_num_joints; i++)
+            {
+                base::JointState& joint(current_config[i]);
+                vector_current_config[i] = joint.position;
+            }
+        }
+        else
+            _current_config_vector_double.read(vector_current_config);  // Current arm configuration
+
+        // Range input angles from 0 to 2pi
+        for (int i = 0; i < arm_num_joints; i++)
+        {
+            vector_current_config.at(i) = coupledControl->constrainAngle(
+                arm_joints_direction.at(i) * vector_current_config.at(i), negative_angles);
+            vector_current_config.at(i) = coupledControl->constrainAngle(
+                vector_current_config.at(i) - config_change.at(i), negative_angles);
+        }
+
+
+        if(final_movement_counter < arm_final_movement.size())
+        {
+            bool config_reached = true;
+            // Changing from base::samples::Joints to vector<double>
+            for (int i = 0; i < arm_num_joints; i++)
+            {
+                double config_ratio = arm_final_movement[final_movement_counter][i]/vector_current_config[i];
+                if((config_ratio > 1.01 || config_ratio < 0.99)&&(abs(vector_current_config[i])>0.05)) 
+                    config_reached = false;
+            }
+            if(config_reached) final_movement_counter++;
+
+            next_config = arm_final_movement[final_movement_counter];
+            std::cout<<"Final movement counter: "<<final_movement_counter<<std::endl;
+            std::cout<<"Arm final movement size: "<<arm_final_movement.size()<<" "<<arm_final_movement[0].size()<<std::endl;
+            std::cout<<"Received: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<"]"<<std::endl; 
+            std::cout<<"Sending: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<"]"<<std::endl;
+
+            std::vector<std::string> names;
+            // Changing from vector<double> to base::commands::Joints
+            if (position_commands == 0)
+            {
+                // Changing from vector<double> to base::commands::Joints (speeds)
+                std::vector<float> aux_arm_joints_speed;
+                coupledControl->getArmSpeed(gain,
+                                            next_config,
+                                            vector_current_config,
+                                            arm_joints_speed);
+
                 for (int i = 0; i < arm_num_joints; i++)
                 {
-                    base::JointState& joint(current_config[i]);
-                    vector_current_config[i] = joint.position;
-                    double config_ratio = arm_final_movement[final_movement_counter][i]/vector_current_config[i];
-                    if((config_ratio > 1.01 || config_ratio < 0.99)&&(abs(vector_current_config[i])>0.05)) 
-                        config_reached = false;
+                    names.push_back(std::string("ARM_JOINT_%i",i));
+                    aux_arm_joints_speed.push_back((float)arm_joints_speed[i]);
                 }
-                if(config_reached) final_movement_counter++;
 
-                next_config = arm_final_movement[final_movement_counter];
+                base::commands::Joints velocity_command(
+                    base::commands::Joints::Speeds(aux_arm_joints_speed, names));
+                velocity_command.time = base::Time::now();
+                if(is_vector_double)
+                    _manipulator_command_vector_double.write(arm_joints_speed);
+                else
+                    _manipulator_command.write(velocity_command);    
+            }
+            else
+            {
+                for (int i = 0; i < arm_num_joints; i++)
+                {
+                    next_config.at(i) = coupledControl->constrainAngle(
+                        next_config.at(i) + config_change.at(i), negative_angles);
+                    next_config.at(i) = coupledControl->constrainAngle(
+                        arm_joints_direction.at(i) * next_config.at(i), negative_angles);
+
+                    names.push_back(std::string("ARM_JOINT_%i",i));
+                }
 
                 // Changing from vector<double> to base::commands::Joints
-                std::vector<std::string> names;
-                for(int i = 0; i < arm_num_joints; i++)
-                    names.push_back(std::string("ARM_JOINT_%i",i));
                 base::commands::Joints position_command(
                     base::commands::Joints::Positions(next_config, names));
                 position_command.time = base::Time::now();
@@ -232,16 +303,19 @@ void Task::updateHook()
                     _manipulator_command_vector_double.write(next_config);
                 else
                     _manipulator_command.write(position_command);    
-                _motion_command.read(motion_command);
-                base::commands::Motion2D stop;
-                stop = motion_command;
-                stop.translation = 0;
-                stop.rotation = 0;
-                _modified_motion_command.write(stop);
-
             }
+
+
+
+            _motion_command.read(motion_command);
+            base::commands::Motion2D stop;
+            stop = motion_command;
+            stop.translation = 0;
+            stop.rotation = 0;
+            _modified_motion_command.write(stop);
         }
-    }*/
+    }
+
 }
 void Task::errorHook() { TaskBase::errorHook(); }
 void Task::stopHook() { TaskBase::stopHook(); }
