@@ -243,6 +243,10 @@ void Task::updateHook()
         if(final_movement_counter < arm_final_movement.size())
         {
             bool config_reached = true;
+            std::cout<<"Final movement counter: "<<final_movement_counter<<std::endl;
+            std::cout<<"Arm final movement size: "<<arm_final_movement.size()<<" "<<arm_final_movement[0].size()<<std::endl;
+            std::cout<<"Received: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<"]"<<std::endl; 
+            std::cout<<"Sending: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<"]"<<std::endl;
             // Changing from base::samples::Joints to vector<double>
             for (int i = 0; i < arm_num_joints; i++)
             {
@@ -252,11 +256,13 @@ void Task::updateHook()
             }
             if(config_reached) final_movement_counter++;
 
-            next_config = arm_final_movement[final_movement_counter];
-            std::cout<<"Final movement counter: "<<final_movement_counter<<std::endl;
-            std::cout<<"Arm final movement size: "<<arm_final_movement.size()<<" "<<arm_final_movement[0].size()<<std::endl;
-            std::cout<<"Received: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<"]"<<std::endl; 
-            std::cout<<"Sending: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<"]"<<std::endl;
+            if(final_movement_counter < arm_final_movement.size()) 
+                next_config = arm_final_movement[final_movement_counter];
+            else
+            {
+                std::cout<<"Ended picking movement\n";
+                performing_final_movement = 3;
+            }
 
             std::vector<std::string> names;
             // Changing from vector<double> to base::commands::Joints
@@ -264,15 +270,24 @@ void Task::updateHook()
             {
                 // Changing from vector<double> to base::commands::Joints (speeds)
                 std::vector<float> aux_arm_joints_speed;
-                coupledControl->getArmSpeed(gain,
+                if(performing_final_movement == 3) 
+                {
+                    for(int i = 0; i < arm_num_joints; i++)
+                        arm_joints_speed[i] = 0;
+                }
+                else
+                {
+                    coupledControl->getArmSpeed(gain,
                                             next_config,
                                             vector_current_config,
                                             arm_joints_speed);
+                }
 
                 for (int i = 0; i < arm_num_joints; i++)
                 {
                     names.push_back(std::string("ARM_JOINT_%i",i));
                     aux_arm_joints_speed.push_back((float)arm_joints_speed[i]);
+
                 }
 
                 base::commands::Joints velocity_command(
