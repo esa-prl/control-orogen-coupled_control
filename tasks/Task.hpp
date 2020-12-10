@@ -37,9 +37,12 @@ class Task : public TaskBase
     std::string final_movement_file;
 
     // Input variables
+    int trajectory_status;
+
     base::commands::Motion2D motion_command;
     int current_segment;
-    int trajectory_status;
+    base::samples::RigidBodyState pose;
+    base::Waypoint current_waypoint;
 
     int size_path;
     std::vector<int> assignment;

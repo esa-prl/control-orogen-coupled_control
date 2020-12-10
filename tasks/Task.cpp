@@ -90,6 +90,8 @@ void Task::updateHook()
             else
                 _current_config_vector_double.read(vector_current_config);  // Current arm configuration
             _current_segment.read(current_segment);
+            _pose.read(pose);
+            _current_waypoint.read(current_waypoint);
 
             LOG_INFO_S << "Coupled control: inputs received. Current segment:" << current_segment
                       << std::endl;
@@ -110,10 +112,18 @@ void Task::updateHook()
 
             // Rover motion command is modified
             modified_motion_command = motion_command;
+            std::vector<double> goal_pose = {current_waypoint.position[0],
+                                             current_waypoint.position[1],
+                                             current_waypoint.heading};
 
-            coupledControl->modifyMotionCommand(gain,
-                                                next_config,
+            std::vector<double> current_pose = {pose.position.x(),
+                                                pose.position.y(),
+                                                pose.getYaw()};
+
+            coupledControl->modifyMotionCommand(next_config,
                                                 vector_current_config,
+                                                goal_pose,
+                                                current_pose,
                                                 m_max_speed,
                                                 arm_joints_speed,
                                                 modified_motion_command);
@@ -277,10 +287,10 @@ void Task::updateHook()
                 }
                 else
                 {
-                    coupledControl->getArmSpeed(gain,
-                                            next_config,
-                                            vector_current_config,
-                                            arm_joints_speed);
+                    coupledControl->getArmSpeed(m_max_speed,
+                                                next_config,
+                                                vector_current_config,
+                                                arm_joints_speed);
                 }
 
                 for (int i = 0; i < arm_num_joints; i++)
