@@ -17,7 +17,6 @@ task_context "Task" do
     property "is_vector_double", "bool"
     property "position_commands","int"
     property "m_max_speed", "double"
-	property "gain", "double"
 	property "arm_num_joints", "int"
 	property "arm_model_initial_config","std/vector<double>"
 	property "arm_real_initial_config","std/vector<double>"

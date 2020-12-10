@@ -27,7 +27,6 @@ class Task : public TaskBase
     bool is_vector_double;
     int position_commands;
     double m_max_speed;
-    double gain;
     int arm_num_joints;
     std::vector<double> arm_model_initial_config;
     std::vector<double> arm_real_initial_config;
