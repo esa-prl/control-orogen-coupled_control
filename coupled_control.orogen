@@ -33,6 +33,7 @@ task_context "Task" do
 
 	input_port("size_path","int")
 	input_port("assignment", "std/vector<int>")
+	input_port("kinova_final_movement_port","int")
 	input_port("arm_profile", "motion_planning/ArmProfile")
 	input_port("final_movement_matrix_port", "motion_planning/ArmProfile")
 

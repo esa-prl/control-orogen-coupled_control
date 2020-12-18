@@ -63,8 +63,10 @@ void Task::updateHook()
 {
     TaskBase::updateHook();
 
-    _trajectory_status.read(trajectory_status);
-    if(trajectory_status != 2 && final_movement_counter < 0)
+    _kinova_final_movement_port.read(kinova_final_movement_index);
+ //   _trajectory_status.read(trajectory_status);
+    //if(trajectory_status != 2 && final_movement_counter < 0)
+    if( kinova_final_movement_index != 1 && final_movement_counter < 0)
     {
 
 
@@ -185,7 +187,9 @@ void Task::updateHook()
     
     }
     
-    else if(performing_final_movement == 1 || performing_final_movement == 2)
+    else if(performing_final_movement == 1 || performing_final_movement == 2 && (kinova_final_movement_index != 0))
+    //else if((performing_final_movement == 1 || performing_final_movement == 2)&&(kinova_final_movement_index == 1))
+
     { 
         if(final_movement_counter < 0)
         {
@@ -251,8 +255,11 @@ void Task::updateHook()
             for (int i = 0; i < arm_num_joints; i++)
             {
                 double config_ratio = arm_final_movement[final_movement_counter][i]/vector_current_config[i];
+//std::cout<<"coonfig_ratio : " <<config_ratio<<"\n";
                 if((config_ratio > 1.01 || config_ratio < 0.99)&&(abs(vector_current_config[i])>0.05)) 
+//std::cout<<"ha entrado : " <<config_reached<<"\n";
                     config_reached = false;
+//std::cout<<"coonfig_reached : " <<config_reached<<"\n";
             }
             if(config_reached) final_movement_counter++;
 

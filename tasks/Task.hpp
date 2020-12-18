@@ -36,6 +36,8 @@ class Task : public TaskBase
     int negative_angles;
     std::string final_movement_file;
 
+    int kinova_final_movement_index;
+
     // Input variables
     base::commands::Motion2D motion_command;
     int current_segment;
