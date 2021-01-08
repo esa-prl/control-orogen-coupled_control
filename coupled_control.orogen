@@ -30,13 +30,11 @@ task_context "Task" do
     input_port("motion_command", "base/commands/Motion2D")
 	input_port("current_segment", "int")
 	input_port("trajectory_status", "int")
-
 	input_port("size_path","int")
 	input_port("assignment", "std/vector<int>")
 	input_port("kinova_final_movement_port","int")
 	input_port("arm_profile", "motion_planning/ArmProfile")
 	input_port("final_movement_matrix_port", "motion_planning/ArmProfile")
-
 	input_port("current_config", "/base/samples/Joints")
 	input_port("current_config_vector_double", "std/vector<double>")
 

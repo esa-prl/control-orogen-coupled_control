@@ -36,6 +36,7 @@ class Task : public TaskBase
     int negative_angles;
     std::string final_movement_file;
 
+    // Index received from kinova planning to know if the performed arm movement is the final one 
     int kinova_final_movement_index;
 
     // Input variables

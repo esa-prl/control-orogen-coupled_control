@@ -63,9 +63,9 @@ void Task::updateHook()
 {
     TaskBase::updateHook();
 
+    // Reading from kinova planning an index to know if the performed arm movement is the last one
     _kinova_final_movement_port.read(kinova_final_movement_index);
- //   _trajectory_status.read(trajectory_status);
-    //if(trajectory_status != 2 && final_movement_counter < 0)
+
     if( kinova_final_movement_index != 1 && final_movement_counter < 0)
     {
 
@@ -188,7 +188,6 @@ void Task::updateHook()
     }
     
     else if(performing_final_movement == 1 || performing_final_movement == 2 && (kinova_final_movement_index != 0))
-    //else if((performing_final_movement == 1 || performing_final_movement == 2)&&(kinova_final_movement_index == 1))
 
     { 
         if(final_movement_counter < 0)
@@ -247,19 +246,12 @@ void Task::updateHook()
         if(final_movement_counter < arm_final_movement.size())
         {
             bool config_reached = true;
-            std::cout<<"Final movement counter: "<<final_movement_counter<<std::endl;
-            std::cout<<"Arm final movement size: "<<arm_final_movement.size()<<" "<<arm_final_movement[0].size()<<std::endl;
-            std::cout<<"Received: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<"]"<<std::endl; 
-            std::cout<<"Sending: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<"]"<<std::endl;
             // Changing from base::samples::Joints to vector<double>
             for (int i = 0; i < arm_num_joints; i++)
             {
                 double config_ratio = arm_final_movement[final_movement_counter][i]/vector_current_config[i];
-//std::cout<<"coonfig_ratio : " <<config_ratio<<"\n";
                 if((config_ratio > 1.01 || config_ratio < 0.99)&&(abs(vector_current_config[i])>0.05)) 
-//std::cout<<"ha entrado : " <<config_reached<<"\n";
                     config_reached = false;
-//std::cout<<"coonfig_reached : " <<config_reached<<"\n";
             }
             if(config_reached) final_movement_counter++;
 
