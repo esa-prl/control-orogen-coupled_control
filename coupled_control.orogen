@@ -3,7 +3,6 @@ version "0.1"
 
 using_library "coupled_control"
 
-import_types_from "motion_planning/motion_planningTypes.hpp"
 import_types_from "coupled_controlTypes.hpp"
 import_types_from "std"
 import_types_from "base"
