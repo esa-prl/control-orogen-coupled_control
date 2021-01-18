@@ -19,7 +19,6 @@ bool Task::configureHook()
     is_vector_double = _is_vector_double.get();    // Sending std::vector::double or base::samples::Joints
     position_commands = _position_commands.get();  // Position or velocity commands
     m_max_speed = _m_max_speed.get();              // Maximum manipulator's joints angular speed
-    gain = _gain.get();                            // Position control gain
     arm_num_joints = _arm_num_joints.get();                // Number of manipulator's joints
     performing_final_movement = _performing_final_movement.get();                 //Variable to check arm final movement input type: it's 0 if it's from a file, 1 if it's from a matrix given by the arm planner 
 
@@ -91,98 +90,115 @@ void Task::updateHook()
             }
             else
                 _current_config_vector_double.read(vector_current_config);  // Current arm configuration
-            _current_segment.read(current_segment);
-
-            LOG_INFO_S << "Coupled control: inputs received. Current segment:" << current_segment
-                      << std::endl;
-            // Next manipulator's joints configuration
-            coupledControl->selectNextManipulatorPosition(
-                current_segment, &arm_profile.position, &next_config, negative_angles);
-
-            // Range input angles from 0 to 2pi
-            for (int i = 0; i < arm_num_joints; i++)
+            if(!_current_segment.read(current_segment)==RTT::NoData && 
+               !_pose.read(pose)==RTT::NoData &&
+               !_current_waypoint.read(current_waypoint)==RTT::NoData)
             {
-                vector_current_config.at(i) = coupledControl->constrainAngle(
-                    arm_joints_direction.at(i) * vector_current_config.at(i), negative_angles);
-                vector_current_config.at(i) = coupledControl->constrainAngle(
-                    vector_current_config.at(i) - config_change.at(i), negative_angles);
-            }
+                LOG_INFO_S << "Coupled control: inputs received. Current segment:" << current_segment
+                          << std::endl;
+                // Next manipulator's joints configuration
+                coupledControl->selectNextManipulatorPosition(
+                    current_segment, &arm_profile.position, &next_config, negative_angles);
 
-            // Position control
-
-            // Rover motion command is modified
-            modified_motion_command = motion_command;
-
-            coupledControl->modifyMotionCommand(gain,
-                                                next_config,
-                                                vector_current_config,
-                                                m_max_speed,
-                                                arm_joints_speed,
-                                                modified_motion_command);
-            
-            first_command = 0;
-
-            modified_motion_command.translation =
-                modified_motion_command.translation * (1 - smooth_factor)
-                + last_motion_command.translation * smooth_factor;
-            modified_motion_command.rotation = modified_motion_command.rotation * (1 - smooth_factor)
-                                               + last_motion_command.rotation * smooth_factor;
-
-            if (motion_command.translation == 0) modified_motion_command.translation = 0;
-            if (motion_command.rotation == 0) modified_motion_command.rotation = 0;
-
-            last_motion_command.translation = modified_motion_command.translation;
-            last_motion_command.rotation = modified_motion_command.rotation;
-
-            // Sending outputs
-            _modified_motion_command.write(modified_motion_command);
-
-            std::vector<std::string> names;
-
-
-            if (position_commands == 0)
-            {
-                // Changing from vector<double> to base::commands::Joints (speeds)
-                std::vector<float> aux_arm_joints_speed;
-
+                // Range input angles from 0 to 2pi
                 for (int i = 0; i < arm_num_joints; i++)
                 {
-                    names.push_back(std::string("ARM_JOINT_%i",i));
-                    aux_arm_joints_speed.push_back((float)arm_joints_speed[i]);
+                    vector_current_config.at(i) = coupledControl->constrainAngle(
+                        arm_joints_direction.at(i) * vector_current_config.at(i), negative_angles);
+                    vector_current_config.at(i) = coupledControl->constrainAngle(
+                        vector_current_config.at(i) - config_change.at(i), negative_angles);
                 }
 
-                base::commands::Joints velocity_command(
-                    base::commands::Joints::Speeds(aux_arm_joints_speed, names));
-                velocity_command.time = base::Time::now();
-                if(is_vector_double)
-                    _manipulator_command_vector_double.write(arm_joints_speed);
-                else
-                    _manipulator_command.write(velocity_command);    
-            }
-            else
-            {
-                for (int i = 0; i < arm_num_joints; i++)
+                // Position control
+
+                // Rover motion command is modified
+                modified_motion_command = motion_command;
+                std::vector<double> goal_pose = {current_waypoint.position[0],
+                                                 current_waypoint.position[1],
+                                                 current_waypoint.heading};
+
+                std::vector<double> current_pose = {pose.position.x(),
+                                                    pose.position.y(),
+                                                    pose.getYaw()};
+
+                //std::cout<<"Goal pose: ["<<goal_pose[0]<<" "<<goal_pose[1]<<", yaw "<<goal_pose[2]<<"]\n";
+                //std::cout<<"Current pose: ["<<current_pose[0]<<" "<<current_pose[1]<<", yaw "<<current_pose[2]<<"]\n";
+                coupledControl->modifyMotionCommand(next_config,
+                                                    vector_current_config,
+                                                    goal_pose,
+                                                    current_pose,
+                                                    m_max_speed,
+                                                    arm_joints_speed,
+                                                    modified_motion_command);
+                
+                std::cout<<"Arm joints speed: ["<<arm_joints_speed[0]<<" "<<arm_joints_speed[1]<<" "<<arm_joints_speed[2]<<" "<<arm_joints_speed[3]<<" "<<arm_joints_speed[4]<<" "<<arm_joints_speed[5]<<"]\n";
+                std::cout<<"Arm joints position: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<" "<<vector_current_config[5]<<"]\n";
+                std::cout<<"Arm joints position objective: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<" "<<next_config[5]<<"]\n";
+                if(isnan(arm_joints_speed[0])) throw(0); 
+                first_command = 0;
+
+                modified_motion_command.translation =
+                    modified_motion_command.translation * (1 - smooth_factor)
+                    + last_motion_command.translation * smooth_factor;
+                modified_motion_command.rotation = modified_motion_command.rotation * (1 - smooth_factor)
+                                                   + last_motion_command.rotation * smooth_factor;
+
+                if (motion_command.translation == 0) modified_motion_command.translation = 0;
+                if (motion_command.rotation == 0) modified_motion_command.rotation = 0;
+
+                last_motion_command.translation = modified_motion_command.translation;
+                last_motion_command.rotation = modified_motion_command.rotation;
+
+                // Sending outputs
+                _modified_motion_command.write(modified_motion_command);
+
+                std::vector<std::string> names;
+
+
+                if (position_commands == 0)
                 {
-                    next_config.at(i) = coupledControl->constrainAngle(
-                        next_config.at(i) + config_change.at(i), negative_angles);
-                    next_config.at(i) = coupledControl->constrainAngle(
-                        arm_joints_direction.at(i) * next_config.at(i), negative_angles);
+                    // Changing from vector<double> to base::commands::Joints (speeds)
+                    std::vector<float> aux_arm_joints_speed;
 
-                    names.push_back(std::string("ARM_JOINT_%i",i));
+                    for (int i = 0; i < arm_num_joints; i++)
+                    {
+                        names.push_back(std::string("ARM_JOINT_%i",i));
+                        aux_arm_joints_speed.push_back((float)arm_joints_speed[i]);
+                    }
+
+                    base::commands::Joints velocity_command(
+                        base::commands::Joints::Speeds(aux_arm_joints_speed, names));
+                    velocity_command.time = base::Time::now();
+                    if(is_vector_double)
+                        _manipulator_command_vector_double.write(arm_joints_speed);
+                    else
+                        _manipulator_command.write(velocity_command);    
+                }
+                else
+                {
+                    for (int i = 0; i < arm_num_joints; i++)
+                    {
+                        next_config.at(i) = coupledControl->constrainAngle(
+                            next_config.at(i) + config_change.at(i), negative_angles);
+                        next_config.at(i) = coupledControl->constrainAngle(
+                            arm_joints_direction.at(i) * next_config.at(i), negative_angles);
+
+                        names.push_back(std::string("ARM_JOINT_%i",i));
+                    }
+
+                    // Changing from vector<double> to base::commands::Joints
+                    base::commands::Joints position_command(
+                        base::commands::Joints::Positions(next_config, names));
+                    position_command.time = base::Time::now();
+                    if(is_vector_double)
+                        _manipulator_command_vector_double.write(next_config);
+                    else
+                        _manipulator_command.write(position_command);    
                 }
 
-                // Changing from vector<double> to base::commands::Joints
-                base::commands::Joints position_command(
-                    base::commands::Joints::Positions(next_config, names));
-                position_command.time = base::Time::now();
-                if(is_vector_double)
-                    _manipulator_command_vector_double.write(next_config);
-                else
-                    _manipulator_command.write(position_command);    
+                LOG_INFO_S << "Motion command. Translation: " << modified_motion_command.translation
+                          << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
             }
-
-            LOG_INFO_S << "Motion command. Translation: " << modified_motion_command.translation
-                      << ". Rotation: " << modified_motion_command.rotation << "." << std::endl;
         }
     
     }
@@ -276,10 +292,10 @@ void Task::updateHook()
                 }
                 else
                 {
-                    coupledControl->getArmSpeed(gain,
-                                            next_config,
-                                            vector_current_config,
-                                            arm_joints_speed);
+                    coupledControl->getArmSpeed(m_max_speed,
+                                                next_config,
+                                                vector_current_config,
+                                                arm_joints_speed);
                 }
 
                 for (int i = 0; i < arm_num_joints; i++)

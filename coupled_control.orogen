@@ -16,7 +16,6 @@ task_context "Task" do
     property "is_vector_double", "bool"
     property "position_commands","int"
     property "m_max_speed", "double"
-	property "gain", "double"
 	property "arm_num_joints", "int"
 	property "arm_model_initial_config","std/vector<double>"
 	property "arm_real_initial_config","std/vector<double>"
@@ -26,9 +25,13 @@ task_context "Task" do
     property "final_movement_file", "std/string"
     property "performing_final_movement", "int"
 	
+	input_port("trajectory_status", "int")
+
     input_port("motion_command", "base/commands/Motion2D")
 	input_port("current_segment", "int")
-	input_port("trajectory_status", "int")
+    input_port("pose","base/samples/RigidBodyState")
+    input_port("current_waypoint", "base/Waypoint")
+
 	input_port("size_path","int")
 	input_port("assignment", "std/vector<int>")
 	input_port("kinova_final_movement_port","int")
@@ -36,6 +39,7 @@ task_context "Task" do
 	input_port("final_movement_matrix_port", "motion_planning/ArmProfile")
 	input_port("current_config", "/base/samples/Joints")
 	input_port("current_config_vector_double", "std/vector<double>")
+
 
     output_port("modified_motion_command", "base/commands/Motion2D")
 	output_port("manipulator_command", "base/commands/Joints")

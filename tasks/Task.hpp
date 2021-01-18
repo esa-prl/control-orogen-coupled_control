@@ -27,7 +27,6 @@ class Task : public TaskBase
     bool is_vector_double;
     int position_commands;
     double m_max_speed;
-    double gain;
     int arm_num_joints;
     std::vector<double> arm_model_initial_config;
     std::vector<double> arm_real_initial_config;
@@ -40,9 +39,12 @@ class Task : public TaskBase
     int kinova_final_movement_index;
 
     // Input variables
+    int trajectory_status;
+
     base::commands::Motion2D motion_command;
     int current_segment;
-    int trajectory_status;
+    base::samples::RigidBodyState pose;
+    base::Waypoint current_waypoint;
 
     int size_path;
     std::vector<int> assignment;
