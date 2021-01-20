@@ -123,6 +123,7 @@ void Task::updateHook()
 
                 //std::cout<<"Goal pose: ["<<goal_pose[0]<<" "<<goal_pose[1]<<", yaw "<<goal_pose[2]<<"]\n";
                 //std::cout<<"Current pose: ["<<current_pose[0]<<" "<<current_pose[1]<<", yaw "<<current_pose[2]<<"]\n";
+
                 coupledControl->modifyMotionCommand(next_config,
                                                     vector_current_config,
                                                     goal_pose,
@@ -131,9 +132,10 @@ void Task::updateHook()
                                                     arm_joints_speed,
                                                     modified_motion_command);
                 
-                std::cout<<"Arm joints speed: ["<<arm_joints_speed[0]<<" "<<arm_joints_speed[1]<<" "<<arm_joints_speed[2]<<" "<<arm_joints_speed[3]<<" "<<arm_joints_speed[4]<<" "<<arm_joints_speed[5]<<"]\n";
-                std::cout<<"Arm joints position: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<" "<<vector_current_config[5]<<"]\n";
-                std::cout<<"Arm joints position objective: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<" "<<next_config[5]<<"]\n";
+                //std::cout<<"Arm joints speed: ["<<arm_joints_speed[0]<<" "<<arm_joints_speed[1]<<" "<<arm_joints_speed[2]<<" "<<arm_joints_speed[3]<<" "<<arm_joints_speed[4]<<" "<<arm_joints_speed[5]<<"]\n";
+                //std::cout<<"Arm joints position: ["<<vector_current_config[0]<<" "<<vector_current_config[1]<<" "<<vector_current_config[2]<<" "<<vector_current_config[3]<<" "<<vector_current_config[4]<<" "<<vector_current_config[5]<<"]\n";
+                //std::cout<<"Arm joints position objective: ["<<next_config[0]<<" "<<next_config[1]<<" "<<next_config[2]<<" "<<next_config[3]<<" "<<next_config[4]<<" "<<next_config[5]<<"]\n";
+
                 if(isnan(arm_joints_speed[0])) throw(0); 
                 first_command = 0;
 
