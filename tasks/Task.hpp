@@ -20,8 +20,8 @@ class Task : public TaskBase
 {
     friend class TaskBase;
 
-  protected:
-    coupled_control::coupledControl* coupledControl;
+protected:
+    coupled_control::coupledControl *coupledControl;
 
     // Property variables.
     bool is_vector_double;
@@ -34,23 +34,25 @@ class Task : public TaskBase
     double smooth_factor;
     int negative_angles;
     std::string final_movement_file;
-
-    // Index received from kinova planning to know if the performed arm movement is the final one 
-    int kinova_final_movement_index;
+    int performing_final_movement;
 
     // Input variables
     int trajectory_status;
-
     base::commands::Motion2D motion_command;
     int current_segment;
     base::samples::RigidBodyState pose;
     base::Waypoint current_waypoint;
-
+    // Trajectory the rover should follow, given by Kinova Planning
+    std::vector<base::Waypoint> trajectory;
     int size_path;
     std::vector<int> assignment;
+    // Index received from Kinova Planning to know if the performed arm movement
+    // is the final one
+    int kinova_final_movement_index;
     motion_planning::ArmProfile arm_profile;
-
+    motion_planning::ArmProfile final_movement_matrix;
     base::samples::Joints current_config;
+    std::vector<double> vector_current_config;
 
     // Output variables
     base::commands::Motion2D modified_motion_command;
@@ -61,20 +63,15 @@ class Task : public TaskBase
     int saturation;
     int max_arm_speed;
     std::vector<double> config_change;
-    std::vector<double> vector_current_config;
     base::commands::Motion2D last_motion_command;
     int first_command = 1;
-
     std::vector<std::vector<double>> arm_final_movement;
-    motion_planning::ArmProfile final_movement_matrix;
-    
     int final_movement_counter = -1;
-    int performing_final_movement;
     bool received_arm_profile;
 
-  public:
-    Task(std::string const& name = "coupled_control::Task");
-    Task(std::string const& name, RTT::ExecutionEngine* engine);
+public:
+    Task(std::string const &name = "coupled_control::Task");
+    Task(std::string const &name, RTT::ExecutionEngine *engine);
     ~Task();
 
     bool configureHook();
